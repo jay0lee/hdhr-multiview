@@ -187,6 +187,19 @@ fun VideoSlotCard(
                                         )
                                     }
                                 }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = Color(0xCC059669),
+                                    shape = RoundedCornerShape(2.dp)
+                                ) {
+                                    Text(
+                                        text = "HW: MediaCodec",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
                             }
                         }
 

@@ -148,6 +148,52 @@ fun SlotActionDialog(
                     accentColor = AccentAmber,
                     onClick = onClearSlot
                 )
+
+                // Engine & Hardware Decoding Status
+                Surface(
+                    color = Color(0xCC0F172A),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(0.5.dp, Color(0x4038BDF8)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Video Decoder", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "Hardware (MediaCodec)", color = Color(0xFF34D399), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Rendering Plane", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "SurfaceView (Hardware Overlay)", color = PrimaryCyan, fontWeight = FontWeight.Medium, fontSize = 11.sp)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Stream Protocol", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "HTTP MPEG-TS (port 5004)", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 11.sp)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Buffer & Sync", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "1000ms Adaptive Live Buffer", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 11.sp)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {

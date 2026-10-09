@@ -49,6 +49,7 @@ interface MultiViewPlayerController {
     fun VideoView(slotIndex: Int, modifier: Modifier)
     fun release()
     fun getPlayer(slotIndex: Int): ExoPlayer? = null
+    fun getDecoderBadge(slotIndex: Int): String = "HW • MediaCodec"
 }
 
 @OptIn(UnstableApi::class)

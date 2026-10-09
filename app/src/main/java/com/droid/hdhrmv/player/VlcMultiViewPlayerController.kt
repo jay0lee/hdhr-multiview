@@ -24,12 +24,12 @@ class VlcMultiViewPlayerController(
 
     private val libVlc: LibVLC by lazy {
         val options = arrayListOf(
-            "--no-drop-late-frames",
-            "--no-skip-frames",
-            "--network-caching=500",
-            "--live-caching=500",
+            "--network-caching=1000",
+            "--live-caching=1000",
             "--audio-time-stretch",
             "--audio-resampler=soxr",
+            "--deinterlace=1",
+            "--deinterlace-mode=blend",
             "-v"
         )
         LibVLC(context.applicationContext, options)
@@ -48,7 +48,7 @@ class VlcMultiViewPlayerController(
                         MediaPlayer.Event.Playing -> {
                             val isMuted = slotMutedStates[slotIndex]
                             volume = if (isMuted) 0 else 100
-                            Log.i(TAG, "Slot $slotIndex VLC Event: Playing (volume=$volume, muted=$isMuted)")
+                            Log.i(TAG, "Slot $slotIndex VLC Event: Playing (volume=$volume, muted=$isMuted, decoder=${getDecoderBadge(slotIndex)})")
                             onPlaybackStateChanged(slotIndex, true, false, null)
                         }
                         MediaPlayer.Event.Buffering -> {
@@ -77,9 +77,9 @@ class VlcMultiViewPlayerController(
         val layout = activeLayouts[slotIndex] ?: return
         if (!player.vlcVout.areViewsAttached()) {
             try {
-                // Use TextureView (4th arg true) so video survives layout transitions, resizing & orientation changes
-                player.attachViews(layout, null, false, true)
-                Log.d(TAG, "Slot $slotIndex attached views to VLC layout (TextureView)")
+                // Use SurfaceView (4th arg false) for zero-copy hardware video overlay plane rendering (VPU to display)
+                player.attachViews(layout, null, false, false)
+                Log.d(TAG, "Slot $slotIndex attached views to VLC layout (SurfaceView Hardware Overlay)")
             } catch (e: Exception) {
                 Log.w(TAG, "Error attaching views for slot $slotIndex: ${e.message}")
             }
@@ -114,11 +114,13 @@ class VlcMultiViewPlayerController(
 
         try {
             val media = Media(libVlc, Uri.parse(streamUrl)).apply {
-                setHWDecoderEnabled(true, false) // HW accelerated with SW fallback for MPEG2
-                addOption(":network-caching=500")
-                addOption(":live-caching=500")
-                addOption(":clock-jitter=0")
-                addOption(":clock-synchro=0")
+                // Force MediaCodec hardware acceleration (second arg = true forces HW decoding for MPEG-2)
+                setHWDecoderEnabled(true, true)
+                addOption(":codec=mediacodec_ndk,mediacodec_jni,all")
+                addOption(":network-caching=1000")
+                addOption(":live-caching=1000")
+                addOption(":deinterlace=1")
+                addOption(":deinterlace-mode=blend")
             }
             player.media = media
             media.release()
@@ -128,11 +130,28 @@ class VlcMultiViewPlayerController(
             val isMuted = slotMutedStates[slotIndex]
             player.volume = if (isMuted) 0 else 100
             player.play()
-            Log.i(TAG, "Slot $slotIndex playing: $streamUrl (initial volume=${player.volume}, muted=$isMuted)")
+            Log.i(TAG, "Slot $slotIndex playing: $streamUrl (initial volume=${player.volume}, muted=$isMuted, HW=forced)")
         } catch (e: Exception) {
             Log.e(TAG, "Error playing slot $slotIndex: ${e.message}", e)
             onPlaybackStateChanged(slotIndex, false, false, e.message)
         }
+    }
+
+    override fun getDecoderBadge(slotIndex: Int): String {
+        if (slotIndex !in 0..3) return "MediaCodec HW"
+        val player = mediaPlayers[slotIndex] ?: return "MediaCodec HW"
+        val track = player.currentVideoTrack
+        if (track != null && track.width > 0) {
+            val res = if (track.height >= 1000) "1080i" else if (track.height in 700..750) "720p" else "${track.width}x${track.height}"
+            val codecName = when {
+                track.codec?.contains("mp2", true) == true -> "MPEG-2"
+                track.codec?.contains("h264", true) == true -> "H.264"
+                track.codec?.contains("hevc", true) == true || track.codec?.contains("h265", true) == true -> "HEVC"
+                else -> track.codec?.uppercase() ?: "HW"
+            }
+            return "HW • MediaCodec ($codecName $res)"
+        }
+        return "HW • MediaCodec"
     }
 
     override fun stop(slotIndex: Int) {
