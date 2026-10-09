@@ -54,6 +54,7 @@ import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
 import com.droid.hdhrmv.ui.components.CustomEngineDialog
+import com.droid.hdhrmv.ui.components.QuickStartChannelDialog
 import com.droid.hdhrmv.ui.components.SlotActionDialog
 import com.droid.hdhrmv.ui.theme.DarkBackground
 import com.droid.hdhrmv.ui.theme.PrimaryCyan
@@ -80,9 +81,10 @@ fun MainScreen(
     var showOverlaidHUD by remember { mutableStateOf(true) }
 
     // Intercept Back button on Google TV and mobile navigation
-    val isOverlayOpen = state.isChannelPickerOpen || showManualIpDialog || showCustomEngineDialog || state.slotActionTargetSlot != null
+    val isOverlayOpen = state.isChannelPickerOpen || showManualIpDialog || showCustomEngineDialog || state.slotActionTargetSlot != null || state.isQuickStartOpen
     BackHandler(enabled = isOverlayOpen || state.multiviewMode == MultiviewMode.FULLSCREEN || state.isTopBarFocused || showOverlaidHUD) {
         when {
+            state.isQuickStartOpen -> viewModel.closeQuickStart()
             state.isChannelPickerOpen -> viewModel.closeChannelPicker()
             showManualIpDialog -> showManualIpDialog = false
             showCustomEngineDialog -> showCustomEngineDialog = false
@@ -244,6 +246,7 @@ fun MainScreen(
                     canShowSidePanel = hasExtraHorizontalSpace,
                     onToggleSidePanel = { isSidePanelCollapsed = false },
                     onOpenEngineSettings = { showCustomEngineDialog = true },
+                    onQuickStartClick = { viewModel.openQuickStart() },
                     isFocused = state.isTopBarFocused,
                     onDownToGrid = { viewModel.setTopBarFocused(false) }
                 )
@@ -368,6 +371,20 @@ fun MainScreen(
                 },
                 onDismiss = {
                     viewModel.closeChannelPicker()
+                }
+            )
+        }
+
+        // Quick Start Multi-Channel Launcher Dialog (on startup or manual trigger)
+        if (state.isQuickStartOpen) {
+            QuickStartChannelDialog(
+                channels = state.channels,
+                deviceIp = state.selectedDevice?.ipAddress,
+                onLaunch = { selectedChannels ->
+                    viewModel.launchQuickStartChannels(selectedChannels)
+                },
+                onDismiss = {
+                    viewModel.closeQuickStart()
                 }
             )
         }

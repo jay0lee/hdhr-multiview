@@ -68,6 +68,7 @@ fun FloatingTopBar(
     canShowSidePanel: Boolean,
     onToggleSidePanel: () -> Unit,
     onOpenEngineSettings: () -> Unit = {},
+    onQuickStartClick: () -> Unit = {},
     isFocused: Boolean = false,
     onDownToGrid: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -252,6 +253,32 @@ fun FloatingTopBar(
                                 }
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Quick Start 4-Channel Selector Button
+                val quickStartInteraction = remember { MutableInteractionSource() }
+                val isQuickStartFocused by quickStartInteraction.collectIsFocusedAsState()
+                Surface(
+                    color = if (isQuickStartFocused) PrimaryCyan.copy(alpha = 0.35f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                    border = if (isQuickStartFocused) androidx.compose.foundation.BorderStroke(2.dp, PrimaryCyan) else null
+                ) {
+                    IconButton(
+                        onClick = onQuickStartClick,
+                        interactionSource = quickStartInteraction,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .focusable(interactionSource = quickStartInteraction)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = "Quick Start 4 Channels",
+                            tint = PrimaryCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
 

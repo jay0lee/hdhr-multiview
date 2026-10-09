@@ -28,6 +28,8 @@ data class MultiViewUiState(
     val isChannelPickerOpen: Boolean = false,
     val channelPickerTargetSlot: Int? = null,
     val slotActionTargetSlot: Int? = null,
+    val isQuickStartOpen: Boolean = false,
+    val hasShownStartupQuickStart: Boolean = false,
     val isTopBarFocused: Boolean = false,
     val errorMessage: String? = null
 )
@@ -79,12 +81,18 @@ class MultiViewViewModel(
                 val freeCount = HdHomeRunParser.calculateFreeTuners(tuners, device.tunerCount)
 
                 _uiState.update { current ->
+                    val shouldShowQuickStart = !current.hasShownStartupQuickStart &&
+                        current.slots.all { it.channel == null } &&
+                        lineup.isNotEmpty()
+
                     current.copy(
                         isLoading = false,
                         selectedDevice = device.copy(freeTunerCount = freeCount),
                         channels = lineup,
                         freeTunerCount = freeCount,
-                        totalTunerCount = device.tunerCount
+                        totalTunerCount = device.tunerCount,
+                        isQuickStartOpen = if (shouldShowQuickStart) true else current.isQuickStartOpen,
+                        hasShownStartupQuickStart = if (shouldShowQuickStart) true else current.hasShownStartupQuickStart
                     )
                 }
             } catch (e: Exception) {
@@ -242,5 +250,32 @@ class MultiViewViewModel(
         val current = _uiState.value.focusedSlotIndex
         val prev = if (current - 1 < 0) total - 1 else current - 1
         setFocusedSlot(prev)
+    }
+
+    fun openQuickStart() {
+        _uiState.update { it.copy(isQuickStartOpen = true, isTopBarFocused = false) }
+    }
+
+    fun closeQuickStart() {
+        _uiState.update { it.copy(isQuickStartOpen = false) }
+    }
+
+    fun launchQuickStartChannels(selectedChannels: List<Channel>) {
+        _uiState.update { current ->
+            var updatedSlots = current.slots
+            for (i in 0 until MultiviewLayoutManager.MAX_SLOTS) {
+                val ch = selectedChannels.getOrNull(i)
+                updatedSlots = MultiviewLayoutManager.assignChannel(updatedSlots, i, ch)
+            }
+            updatedSlots = MultiviewLayoutManager.setFocusedSlot(updatedSlots, 0)
+            current.copy(
+                slots = updatedSlots,
+                focusedSlotIndex = 0,
+                isQuickStartOpen = false,
+                hasShownStartupQuickStart = true,
+                multiviewMode = MultiviewMode.GRID_4,
+                isTopBarFocused = false
+            )
+        }
     }
 }

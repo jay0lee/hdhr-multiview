@@ -189,4 +189,47 @@ class MultiViewViewModelTest {
         viewModel.setMultiviewMode(MultiviewMode.CAROUSEL)
         assertFalse(viewModel.uiState.value.isTopBarFocused)
     }
+
+    @Test
+    fun startup_withDiscoveredChannelsAndEmptySlots_opensQuickStart() = runTest {
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
+        assertTrue(state.channels.isNotEmpty())
+        assertTrue(state.slots.all { it.channel == null })
+        assertTrue(state.isQuickStartOpen)
+        assertTrue(state.hasShownStartupQuickStart)
+    }
+
+    @Test
+    fun launchQuickStartChannels_assignsChannelsAndSetsGridMode() = runTest {
+        advanceUntilIdle()
+        val ch1 = Channel("3.1", "KYW-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v3.1")
+        val ch2 = Channel("10.1", "WCAU-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v10.1")
+
+        viewModel.launchQuickStartChannels(listOf(ch1, ch2))
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isQuickStartOpen)
+        assertEquals(ch1, state.slots[0].channel)
+        assertEquals(ch2, state.slots[1].channel)
+        assertNull(state.slots[2].channel)
+        assertNull(state.slots[3].channel)
+        assertEquals(0, state.focusedSlotIndex)
+        assertTrue(state.slots[0].isFocused)
+        assertFalse(state.slots[0].isMuted)
+        assertEquals(MultiviewMode.GRID_4, state.multiviewMode)
+    }
+
+    @Test
+    fun openAndCloseQuickStart_togglesState() = runTest {
+        advanceUntilIdle()
+        viewModel.closeQuickStart()
+        assertFalse(viewModel.uiState.value.isQuickStartOpen)
+
+        viewModel.openQuickStart()
+        assertTrue(viewModel.uiState.value.isQuickStartOpen)
+
+        viewModel.closeQuickStart()
+        assertFalse(viewModel.uiState.value.isQuickStartOpen)
+    }
 }
