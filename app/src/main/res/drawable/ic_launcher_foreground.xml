@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer TV frame / screen -->
+    <path
+        android:fillColor="#1E293B"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.5"
+        android:pathData="M24,28 h60 a4,4 0 0,1 4,4 v44 a4,4 0 0,1 -4,4 h-60 a4,4 0 0,1 -4,-4 v-44 a4,4 0 0,1 4,-4 z" />
+    <!-- 4 Multiview quadrants -->
+    <!-- Top-left -->
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M28,32 h24 v18 h-24 z" />
+    <!-- Top-right -->
+    <path
+        android:fillColor="#0EA5E9"
+        android:pathData="M56,32 h24 v18 h-24 z" />
+    <!-- Bottom-left -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M28,54 h24 v18 h-24 z" />
+    <!-- Bottom-right (active with amber badge) -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M56,54 h24 v18 h-24 z" />
+    <!-- Tuner antenna / signal wave on top -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M48,22 L54,28 L60,22" />
+    <path
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M44,18 Q54,14 64,18" />
+</vector>

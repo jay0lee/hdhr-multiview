@@ -1,0 +1,170 @@
+package com.droid.hdhrmv.ui
+
+import android.media.MediaCodecList
+import android.os.Bundle
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.droid.hdhrmv.data.DefaultHdHomeRunNetworkClient
+import com.droid.hdhrmv.data.HdHomeRunRepository
+import com.droid.hdhrmv.player.MultiViewPlayerController
+import com.droid.hdhrmv.player.VlcMultiViewPlayerController
+import com.droid.hdhrmv.ui.theme.HDHRMultiViewTheme
+
+import android.app.UiModeManager
+import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.os.Build
+import android.view.KeyEvent
+import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+
+class MainActivity : ComponentActivity() {
+
+    companion object {
+        private const val TAG = "HDHR_MainActivity"
+    }
+
+    private lateinit var playerController: MultiViewPlayerController
+    private lateinit var viewModel: MultiViewViewModel
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableImmersiveFullscreen()
+
+        // Google TV / Android TV detection: lock to landscape for TV, allow adaptive rotation for phones/tablets
+        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+        val isTv = uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        if (isTv) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+
+        // Diagnostic: Log all available broadcast-relevant audio and video decoders
+        try {
+            val mcl = MediaCodecList(MediaCodecList.ALL_CODECS)
+            for (codec in mcl.codecInfos) {
+                if (!codec.isEncoder) {
+                    val types = codec.supportedTypes.filter {
+                        it.contains("mpeg2", true) ||
+                        it.contains("mp2v", true) ||
+                        it.contains("ac3", true) ||
+                        it.contains("eac3", true) ||
+                        it.contains("hevc", true)
+                    }
+                    if (types.isNotEmpty()) {
+                        Log.i(TAG, "Available Decoder: ${codec.name} supports $types (softwareOnly=${codec.isSoftwareOnly})")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Codec diagnostics error", e)
+        }
+
+        val networkClient = DefaultHdHomeRunNetworkClient()
+        val repository = HdHomeRunRepository(networkClient)
+
+        viewModel = ViewModelProvider(
+            this,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return MultiViewViewModel(repository) as T
+                }
+            }
+        )[MultiViewViewModel::class.java]
+
+        playerController = VlcMultiViewPlayerController(this)
+
+        setContent {
+            HDHRMultiViewTheme {
+                MainScreen(
+                    viewModel = viewModel,
+                    playerController = playerController
+                )
+            }
+        }
+    }
+
+    private fun enableImmersiveFullscreen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enableImmersiveFullscreen()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        enableImmersiveFullscreen()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        for (i in 0..3) {
+            playerController.pause(i)
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        playerController.release()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        val focusedSlot = viewModel.uiState.value.focusedSlotIndex
+        when (keyCode) {
+            KeyEvent.KEYCODE_CHANNEL_UP -> {
+                viewModel.nextChannel(focusedSlot)
+                return true
+            }
+            KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                viewModel.previousChannel(focusedSlot)
+                return true
+            }
+            KeyEvent.KEYCODE_GUIDE -> {
+                viewModel.openChannelPicker(focusedSlot)
+                return true
+            }
+            KeyEvent.KEYCODE_MENU -> {
+                viewModel.cycleLayoutMode()
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_HEADSETHOOK -> {
+                playerController.togglePause(focusedSlot)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                playerController.resume(focusedSlot)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                playerController.pause(focusedSlot)
+                return true
+            }
+            KeyEvent.KEYCODE_VOLUME_MUTE -> {
+                viewModel.toggleSlotMute(focusedSlot)
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+}
