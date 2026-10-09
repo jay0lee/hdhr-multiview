@@ -54,6 +54,7 @@ fun MultiviewContainer(
     slots: List<SlotState>,
     focusedSlotIndex: Int,
     renderVideo: @Composable (Int) -> Unit = {},
+    isTopBarFocused: Boolean = false,
     onSlotClick: (Int) -> Unit,
     onSlotLongClick: (Int) -> Unit = {},
     onChannelClick: (Int) -> Unit,
@@ -71,6 +72,7 @@ fun MultiviewContainer(
                 Grid4Layout(
                     slots = slots,
                     focusedIndex = focusedSlotIndex,
+                    isTopBarFocused = isTopBarFocused,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
                     onSlotLongClick = onSlotLongClick,
@@ -84,6 +86,7 @@ fun MultiviewContainer(
                 Focus1Plus3Layout(
                     slots = slots,
                     focusedIndex = focusedSlotIndex,
+                    isTopBarFocused = isTopBarFocused,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
                     onSlotLongClick = onSlotLongClick,
@@ -97,6 +100,7 @@ fun MultiviewContainer(
                 PipLayout(
                     slots = slots,
                     focusedIndex = focusedSlotIndex,
+                    isTopBarFocused = isTopBarFocused,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
                     onSlotLongClick = onSlotLongClick,
@@ -109,6 +113,7 @@ fun MultiviewContainer(
             MultiviewMode.FULLSCREEN -> {
                 SingleFullscreenLayout(
                     slot = slots.getOrNull(focusedSlotIndex) ?: slots[0],
+                    isTopBarFocused = isTopBarFocused,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
                     onSlotLongClick = onSlotLongClick,
@@ -121,6 +126,7 @@ fun MultiviewContainer(
                 CarouselLayout(
                     slots = slots,
                     focusedIndex = focusedSlotIndex,
+                    isTopBarFocused = isTopBarFocused,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
                     onSlotLongClick = onSlotLongClick,
@@ -138,6 +144,7 @@ fun MultiviewContainer(
 private fun Grid4Layout(
     slots: List<SlotState>,
     focusedIndex: Int,
+    isTopBarFocused: Boolean = false,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
     onSlotLongClick: (Int) -> Unit,
@@ -239,7 +246,8 @@ private fun Grid4Layout(
                                 onSlotFocused = { onSlotSelected(index) },
                                 onChannelClick = { onChannelClick(index) },
                                 onMuteToggle = { onMuteToggle(index) },
-                                onFocusClick = { onFocusClick(index) }
+                                onFocusClick = { onFocusClick(index) },
+                                isTopBarFocused = isTopBarFocused
                             )
                         }
                     }
@@ -272,6 +280,7 @@ private fun Grid4Layout(
 private fun Focus1Plus3Layout(
     slots: List<SlotState>,
     focusedIndex: Int,
+    isTopBarFocused: Boolean = false,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
     onSlotLongClick: (Int) -> Unit,
@@ -308,7 +317,8 @@ private fun Focus1Plus3Layout(
                 onSlotFocused = { onSlotSelected(primarySlot.slotIndex) },
                 onChannelClick = { onChannelClick(primarySlot.slotIndex) },
                 onMuteToggle = { onMuteToggle(primarySlot.slotIndex) },
-                onFocusClick = { onFocusClick(primarySlot.slotIndex) }
+                onFocusClick = { onFocusClick(primarySlot.slotIndex) },
+                isTopBarFocused = isTopBarFocused
             )
 
             // Secondary sidebar (takes 1/4 width, 3 stacked 16:9 slots)
@@ -323,7 +333,8 @@ private fun Focus1Plus3Layout(
                         onSlotFocused = { onSlotSelected(slot.slotIndex) },
                         onChannelClick = { onChannelClick(slot.slotIndex) },
                         onMuteToggle = { onMuteToggle(slot.slotIndex) },
-                        onFocusClick = { onFocusClick(slot.slotIndex) }
+                        onFocusClick = { onFocusClick(slot.slotIndex) },
+                        isTopBarFocused = isTopBarFocused
                     )
                 }
             }
@@ -335,6 +346,7 @@ private fun Focus1Plus3Layout(
 private fun PipLayout(
     slots: List<SlotState>,
     focusedIndex: Int,
+    isTopBarFocused: Boolean = false,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
     onSlotLongClick: (Int) -> Unit,
@@ -371,7 +383,8 @@ private fun PipLayout(
                 onSlotFocused = { onSlotSelected(primarySlot.slotIndex) },
                 onChannelClick = { onChannelClick(primarySlot.slotIndex) },
                 onMuteToggle = { onMuteToggle(primarySlot.slotIndex) },
-                onFocusClick = { onFocusClick(primarySlot.slotIndex) }
+                onFocusClick = { onFocusClick(primarySlot.slotIndex) },
+                isTopBarFocused = isTopBarFocused
             )
 
             // Floating Inset Secondary Slot (bottom-right)
@@ -391,7 +404,8 @@ private fun PipLayout(
                     onSlotFocused = { onSlotSelected(secondarySlot.slotIndex) },
                     onChannelClick = { onChannelClick(secondarySlot.slotIndex) },
                     onMuteToggle = { onMuteToggle(secondarySlot.slotIndex) },
-                    onFocusClick = { onFocusClick(secondarySlot.slotIndex) }
+                    onFocusClick = { onFocusClick(secondarySlot.slotIndex) },
+                    isTopBarFocused = isTopBarFocused
                 )
             }
         }
@@ -401,6 +415,7 @@ private fun PipLayout(
 @Composable
 private fun SingleFullscreenLayout(
     slot: SlotState,
+    isTopBarFocused: Boolean = false,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
     onSlotLongClick: (Int) -> Unit,
@@ -438,7 +453,8 @@ private fun SingleFullscreenLayout(
             onSlotLongClick = { onSlotLongClick(slot.slotIndex) },
             onChannelClick = { onChannelClick(slot.slotIndex) },
             onMuteToggle = { onMuteToggle(slot.slotIndex) },
-            onFocusClick = { onFocusClick(slot.slotIndex) }
+            onFocusClick = { onFocusClick(slot.slotIndex) },
+            isTopBarFocused = isTopBarFocused
         )
     }
 }
@@ -448,6 +464,7 @@ private fun SingleFullscreenLayout(
 private fun CarouselLayout(
     slots: List<SlotState>,
     focusedIndex: Int,
+    isTopBarFocused: Boolean = false,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
     onSlotLongClick: (Int) -> Unit,
@@ -556,7 +573,8 @@ private fun CarouselLayout(
                             } else {
                                 onFocusClick(slot.slotIndex)
                             }
-                        }
+                        },
+                        isTopBarFocused = isTopBarFocused
                     )
                 }
             }

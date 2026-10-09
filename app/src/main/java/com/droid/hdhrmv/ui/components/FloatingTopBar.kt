@@ -16,13 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewSidebar
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.filled.ViewSidebar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -50,6 +49,12 @@ import com.droid.hdhrmv.ui.theme.SurfaceElevated
 import com.droid.hdhrmv.ui.theme.TextPrimary
 import com.droid.hdhrmv.ui.theme.TextSecondary
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+
 @Composable
 fun FloatingTopBar(
     device: HdHomeRunDevice?,
@@ -63,18 +68,44 @@ fun FloatingTopBar(
     canShowSidePanel: Boolean,
     onToggleSidePanel: () -> Unit,
     onOpenEngineSettings: () -> Unit = {},
+    isFocused: Boolean = false,
+    onDownToGrid: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var modeMenuExpanded by remember { mutableStateOf(false) }
+    val layoutModeFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            delay(50)
+            try {
+                layoutModeFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN &&
+                    keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN &&
+                    !modeMenuExpanded
+                ) {
+                    onDownToGrid()
+                    true
+                } else {
+                    false
+                }
+            },
         color = Color(0xD90F172A), // Semi-transparent glassmorphic slate
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 8.dp,
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0x4038BDF8))
+        border = androidx.compose.foundation.BorderStroke(
+            if (isFocused) 1.5.dp else 0.5.dp,
+            if (isFocused) PrimaryCyan else Color(0x4038BDF8)
+        )
     ) {
         Row(
             modifier = Modifier
@@ -108,9 +139,9 @@ fun FloatingTopBar(
                 val devicePillInteraction = remember { MutableInteractionSource() }
                 val isDevicePillFocused by devicePillInteraction.collectIsFocusedAsState()
                 Surface(
-                    color = if (isDevicePillFocused) PrimaryCyan.copy(alpha = 0.25f) else SurfaceElevated.copy(alpha = 0.8f),
+                    color = if (isDevicePillFocused) PrimaryCyan.copy(alpha = 0.35f) else SurfaceElevated.copy(alpha = 0.8f),
                     shape = RoundedCornerShape(10.dp),
-                    border = if (isDevicePillFocused) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryCyan) else null,
+                    border = if (isDevicePillFocused) androidx.compose.foundation.BorderStroke(2.dp, PrimaryCyan) else null,
                     modifier = Modifier
                         .focusable(interactionSource = devicePillInteraction)
                         .clickable(interactionSource = devicePillInteraction, indication = null) { onManualIpClick() }
@@ -174,10 +205,11 @@ fun FloatingTopBar(
                 val isLayoutModeFocused by layoutModeInteraction.collectIsFocusedAsState()
                 Box {
                     Surface(
-                        color = if (isLayoutModeFocused) PrimaryCyan.copy(alpha = 0.25f) else SurfaceElevated.copy(alpha = 0.8f),
+                        color = if (isLayoutModeFocused) PrimaryCyan.copy(alpha = 0.35f) else SurfaceElevated.copy(alpha = 0.8f),
                         shape = RoundedCornerShape(8.dp),
-                        border = if (isLayoutModeFocused) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryCyan) else null,
+                        border = if (isLayoutModeFocused) androidx.compose.foundation.BorderStroke(2.dp, PrimaryCyan) else null,
                         modifier = Modifier
+                            .focusRequester(layoutModeFocusRequester)
                             .focusable(interactionSource = layoutModeInteraction)
                             .clickable(interactionSource = layoutModeInteraction, indication = null) { modeMenuExpanded = true }
                     ) {
@@ -225,16 +257,27 @@ fun FloatingTopBar(
 
                 if (canShowSidePanel) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = onToggleSidePanel,
-                        modifier = Modifier.size(28.dp)
+                    val sidePanelInteraction = remember { MutableInteractionSource() }
+                    val isSidePanelFocused by sidePanelInteraction.collectIsFocusedAsState()
+                    Surface(
+                        color = if (isSidePanelFocused) PrimaryCyan.copy(alpha = 0.35f) else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp),
+                        border = if (isSidePanelFocused) androidx.compose.foundation.BorderStroke(2.dp, PrimaryCyan) else null
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ViewSidebar,
-                            contentDescription = "Show Side Panel",
-                            tint = PrimaryCyan,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        IconButton(
+                            onClick = onToggleSidePanel,
+                            interactionSource = sidePanelInteraction,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .focusable(interactionSource = sidePanelInteraction)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ViewSidebar,
+                                contentDescription = "Show Side Panel",
+                                tint = PrimaryCyan,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
 
@@ -242,38 +285,50 @@ fun FloatingTopBar(
 
                 val refreshInteraction = remember { MutableInteractionSource() }
                 val isRefreshFocused by refreshInteraction.collectIsFocusedAsState()
-                IconButton(
-                    onClick = onRefresh,
-                    interactionSource = refreshInteraction,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .focusable(interactionSource = refreshInteraction)
+                Surface(
+                    color = if (isRefreshFocused) PrimaryCyan.copy(alpha = 0.35f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                    border = if (isRefreshFocused) androidx.compose.foundation.BorderStroke(2.dp, PrimaryCyan) else null
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = if (isRefreshFocused) PrimaryCyan else TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    IconButton(
+                        onClick = onRefresh,
+                        interactionSource = refreshInteraction,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .focusable(interactionSource = refreshInteraction)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = if (isRefreshFocused) PrimaryCyan else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(4.dp))
 
                 val settingsInteraction = remember { MutableInteractionSource() }
                 val isSettingsFocused by settingsInteraction.collectIsFocusedAsState()
-                IconButton(
-                    onClick = onOpenEngineSettings,
-                    interactionSource = settingsInteraction,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .focusable(interactionSource = settingsInteraction)
+                Surface(
+                    color = if (isSettingsFocused) PrimaryCyan.copy(alpha = 0.35f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                    border = if (isSettingsFocused) androidx.compose.foundation.BorderStroke(2.dp, PrimaryCyan) else null
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Media Engine Settings",
-                        tint = if (isSettingsFocused) PrimaryCyan else TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    IconButton(
+                        onClick = onOpenEngineSettings,
+                        interactionSource = settingsInteraction,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .focusable(interactionSource = settingsInteraction)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Media Engine Settings",
+                            tint = if (isSettingsFocused) PrimaryCyan else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }

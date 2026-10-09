@@ -139,6 +139,24 @@ class MainActivity : ComponentActivity() {
             return super.onKeyDown(keyCode, event)
         }
 
+        // When Top Bar menu is focused
+        if (currentState.isTopBarFocused) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    viewModel.setTopBarFocused(false)
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK -> {
+                    viewModel.setTopBarFocused(false)
+                    return true
+                }
+                else -> {
+                    // Let Compose handle DPAD_LEFT, DPAD_RIGHT, DPAD_CENTER, ENTER on Top Bar controls
+                    return super.onKeyDown(keyCode, event)
+                }
+            }
+        }
+
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 when (currentState.multiviewMode) {
@@ -150,9 +168,12 @@ class MainActivity : ComponentActivity() {
                         when (focusedSlot) {
                             1 -> viewModel.setFocusedSlot(0)
                             3 -> viewModel.setFocusedSlot(2)
-                            0 -> viewModel.setFocusedSlot(1)
-                            2 -> viewModel.setFocusedSlot(3)
+                            else -> {}
                         }
+                        return true
+                    }
+                    MultiviewMode.CAROUSEL -> {
+                        viewModel.selectPreviousSlot()
                         return true
                     }
                     else -> {
@@ -171,9 +192,12 @@ class MainActivity : ComponentActivity() {
                         when (focusedSlot) {
                             0 -> viewModel.setFocusedSlot(1)
                             2 -> viewModel.setFocusedSlot(3)
-                            1 -> viewModel.setFocusedSlot(0)
-                            3 -> viewModel.setFocusedSlot(2)
+                            else -> {}
                         }
+                        return true
+                    }
+                    MultiviewMode.CAROUSEL -> {
+                        viewModel.selectNextSlot()
                         return true
                     }
                     else -> {
@@ -184,58 +208,49 @@ class MainActivity : ComponentActivity() {
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
                 when (currentState.multiviewMode) {
-                    MultiviewMode.FULLSCREEN -> {
-                        viewModel.setMultiviewMode(MultiviewMode.GRID_4)
-                        return true
-                    }
                     MultiviewMode.GRID_4 -> {
                         when (focusedSlot) {
                             2 -> viewModel.setFocusedSlot(0)
                             3 -> viewModel.setFocusedSlot(1)
-                            else -> viewModel.selectPreviousSlot()
+                            0, 1 -> {
+                                // Top row: move directly to Top Bar menu!
+                                viewModel.setTopBarFocused(true)
+                            }
+                            else -> viewModel.setTopBarFocused(true)
                         }
                         return true
                     }
-                    else -> {
-                        viewModel.selectPreviousSlot()
+                    MultiviewMode.FULLSCREEN,
+                    MultiviewMode.CAROUSEL,
+                    MultiviewMode.PIP,
+                    MultiviewMode.FOCUS_1_PLUS_3 -> {
+                        // Move directly to Top Bar menu!
+                        viewModel.setTopBarFocused(true)
                         return true
                     }
                 }
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 when (currentState.multiviewMode) {
-                    MultiviewMode.FULLSCREEN -> {
-                        viewModel.setMultiviewMode(MultiviewMode.GRID_4)
-                        return true
-                    }
                     MultiviewMode.GRID_4 -> {
                         when (focusedSlot) {
                             0 -> viewModel.setFocusedSlot(2)
                             1 -> viewModel.setFocusedSlot(3)
-                            else -> viewModel.selectNextSlot()
+                            // Bottom row slots (2, 3): stay on bottom row
+                            else -> {}
                         }
                         return true
                     }
-                    else -> {
-                        viewModel.selectNextSlot()
-                        return true
-                    }
+                    else -> return true
                 }
             }
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                val currentSlot = currentState.slots.getOrNull(focusedSlot)
-                if (currentState.multiviewMode == MultiviewMode.FULLSCREEN) {
-                    viewModel.setMultiviewMode(MultiviewMode.GRID_4)
-                    return true
-                } else if (currentSlot?.channel == null) {
-                    viewModel.openChannelPicker(focusedSlot)
-                    return true
-                } else {
-                    viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
-                    return true
+                if (event?.repeatCount == 0) {
+                    event.startTracking()
                 }
+                return true
             }
             KeyEvent.KEYCODE_CHANNEL_UP -> {
                 viewModel.nextChannel(focusedSlot)
@@ -274,5 +289,59 @@ class MainActivity : ComponentActivity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+        val currentState = viewModel.uiState.value
+        val focusedSlot = currentState.focusedSlotIndex
+
+        if (currentState.isChannelPickerOpen || currentState.slotActionTargetSlot != null || currentState.isTopBarFocused) {
+            return super.onKeyLongPress(keyCode, event)
+        }
+
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                // Long-press toggles Fullscreen directly
+                if (currentState.multiviewMode == MultiviewMode.FULLSCREEN) {
+                    viewModel.setMultiviewMode(MultiviewMode.GRID_4)
+                } else {
+                    viewModel.setFocusedSlot(focusedSlot)
+                    viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
+                }
+                return true
+            }
+        }
+        return super.onKeyLongPress(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        val currentState = viewModel.uiState.value
+        val focusedSlot = currentState.focusedSlotIndex
+
+        if (currentState.isChannelPickerOpen || currentState.slotActionTargetSlot != null || currentState.isTopBarFocused) {
+            return super.onKeyUp(keyCode, event)
+        }
+
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                if (event?.isTracking == true && !event.isCanceled) {
+                    val currentSlot = currentState.slots.getOrNull(focusedSlot)
+                    if (currentSlot?.channel == null) {
+                        // Empty slot click: open channel lineup immediately
+                        viewModel.openChannelPicker(focusedSlot)
+                    } else {
+                        // Playing slot click: open Slot Action Dialog (Change Channel is focused as item 1)
+                        viewModel.openSlotActions(focusedSlot)
+                    }
+                    return true
+                }
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 }

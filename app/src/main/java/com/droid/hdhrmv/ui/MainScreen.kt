@@ -81,20 +81,26 @@ fun MainScreen(
 
     // Intercept Back button on Google TV and mobile navigation
     val isOverlayOpen = state.isChannelPickerOpen || showManualIpDialog || showCustomEngineDialog || state.slotActionTargetSlot != null
-    BackHandler(enabled = isOverlayOpen || state.multiviewMode == MultiviewMode.FULLSCREEN || showOverlaidHUD) {
+    BackHandler(enabled = isOverlayOpen || state.multiviewMode == MultiviewMode.FULLSCREEN || state.isTopBarFocused || showOverlaidHUD) {
         when {
             state.isChannelPickerOpen -> viewModel.closeChannelPicker()
             showManualIpDialog -> showManualIpDialog = false
             showCustomEngineDialog -> showCustomEngineDialog = false
             state.slotActionTargetSlot != null -> viewModel.closeSlotActions()
+            state.isTopBarFocused -> {
+                viewModel.setTopBarFocused(false)
+                showOverlaidHUD = false
+            }
             state.multiviewMode == MultiviewMode.FULLSCREEN -> viewModel.setMultiviewMode(MultiviewMode.GRID_4)
             showOverlaidHUD -> showOverlaidHUD = false
         }
     }
 
-    // Auto-hide overlaid HUD after 6 seconds of inactivity
-    LaunchedEffect(showOverlaidHUD) {
-        if (showOverlaidHUD) {
+    // Auto-hide overlaid HUD after 6 seconds of inactivity (unless Top Bar is currently focused)
+    LaunchedEffect(showOverlaidHUD, state.isTopBarFocused) {
+        if (state.isTopBarFocused) {
+            showOverlaidHUD = true
+        } else if (showOverlaidHUD) {
             delay(6000)
             showOverlaidHUD = false
         }
@@ -149,28 +155,29 @@ fun MainScreen(
                     mode = state.multiviewMode,
                     slots = state.slots,
                     focusedSlotIndex = state.focusedSlotIndex,
+                    isTopBarFocused = state.isTopBarFocused,
                     renderVideo = { slotIndex ->
                         playerController.VideoView(slotIndex, Modifier.fillMaxSize())
                     },
                     onSlotClick = { slotIndex ->
-                        if (state.multiviewMode == MultiviewMode.FULLSCREEN) {
-                            // In fullscreen mode, clicking returns to 4-quadrant grid
-                            viewModel.setMultiviewMode(MultiviewMode.GRID_4)
+                        val slot = state.slots.getOrNull(slotIndex)
+                        if (slot?.channel == null) {
+                            // Empty slot: open channel lineup immediately
+                            viewModel.openChannelPicker(slotIndex)
                         } else {
-                            val slot = state.slots.getOrNull(slotIndex)
-                            if (slot?.channel == null) {
-                                viewModel.openChannelPicker(slotIndex)
-                            } else if (state.focusedSlotIndex == slotIndex) {
-                                // Already focused slot: expand to Fullscreen
-                                viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
-                            } else {
-                                // Focus slot and route audio to it
-                                viewModel.setFocusedSlot(slotIndex)
-                            }
+                            // Playing slot: focus slot & sound, and open Quick Action Menu (Change Channel focused by default)
+                            viewModel.setFocusedSlot(slotIndex)
+                            viewModel.openSlotActions(slotIndex)
                         }
                     },
                     onSlotLongClick = { slotIndex ->
-                        viewModel.openSlotActions(slotIndex)
+                        // Long-click toggles Fullscreen directly
+                        viewModel.setFocusedSlot(slotIndex)
+                        if (state.multiviewMode == MultiviewMode.FULLSCREEN) {
+                            viewModel.setMultiviewMode(MultiviewMode.GRID_4)
+                        } else {
+                            viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
+                        }
                     },
                     onChannelClick = { slotIndex ->
                         viewModel.setFocusedSlot(slotIndex)
@@ -236,7 +243,9 @@ fun MainScreen(
                     onManualIpClick = { showManualIpDialog = true },
                     canShowSidePanel = hasExtraHorizontalSpace,
                     onToggleSidePanel = { isSidePanelCollapsed = false },
-                    onOpenEngineSettings = { showCustomEngineDialog = true }
+                    onOpenEngineSettings = { showCustomEngineDialog = true },
+                    isFocused = state.isTopBarFocused,
+                    onDownToGrid = { viewModel.setTopBarFocused(false) }
                 )
             }
         }

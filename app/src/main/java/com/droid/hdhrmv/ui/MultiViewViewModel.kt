@@ -28,6 +28,7 @@ data class MultiViewUiState(
     val isChannelPickerOpen: Boolean = false,
     val channelPickerTargetSlot: Int? = null,
     val slotActionTargetSlot: Int? = null,
+    val isTopBarFocused: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -148,9 +149,14 @@ class MultiViewViewModel(
             val updatedSlots = MultiviewLayoutManager.setFocusedSlot(current.slots, slotIndex)
             current.copy(
                 focusedSlotIndex = slotIndex,
-                slots = updatedSlots
+                slots = updatedSlots,
+                isTopBarFocused = false
             )
         }
+    }
+
+    fun setTopBarFocused(focused: Boolean) {
+        _uiState.update { it.copy(isTopBarFocused = focused) }
     }
 
     fun toggleSlotMute(slotIndex: Int) {
@@ -161,14 +167,15 @@ class MultiViewViewModel(
     }
 
     fun setMultiviewMode(mode: MultiviewMode) {
-        _uiState.update { it.copy(multiviewMode = mode) }
+        _uiState.update { it.copy(multiviewMode = mode, isTopBarFocused = false) }
     }
 
     fun openChannelPicker(slotIndex: Int) {
         _uiState.update {
             it.copy(
                 isChannelPickerOpen = true,
-                channelPickerTargetSlot = slotIndex
+                channelPickerTargetSlot = slotIndex,
+                isTopBarFocused = false
             )
         }
         val device = _uiState.value.selectedDevice
@@ -216,7 +223,7 @@ class MultiViewViewModel(
     }
 
     fun openSlotActions(slotIndex: Int) {
-        _uiState.update { it.copy(slotActionTargetSlot = slotIndex) }
+        _uiState.update { it.copy(slotActionTargetSlot = slotIndex, isTopBarFocused = false) }
     }
 
     fun closeSlotActions() {

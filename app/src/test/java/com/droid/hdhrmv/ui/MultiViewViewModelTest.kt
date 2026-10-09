@@ -170,4 +170,23 @@ class MultiViewViewModelTest {
         assertNull(viewModel.uiState.value.channelPickerTargetSlot)
         assertFalse(viewModel.uiState.value.isChannelPickerOpen)
     }
+
+    @Test
+    fun topBarFocus_stateTransitions() = runTest {
+        assertFalse(viewModel.uiState.value.isTopBarFocused)
+
+        viewModel.setTopBarFocused(true)
+        assertTrue(viewModel.uiState.value.isTopBarFocused)
+
+        // Selecting a slot resets top bar focus
+        viewModel.setFocusedSlot(slotIndex = 2)
+        assertFalse(viewModel.uiState.value.isTopBarFocused)
+
+        viewModel.setTopBarFocused(true)
+        assertTrue(viewModel.uiState.value.isTopBarFocused)
+
+        // Changing multiview mode resets top bar focus
+        viewModel.setMultiviewMode(MultiviewMode.CAROUSEL)
+        assertFalse(viewModel.uiState.value.isTopBarFocused)
+    }
 }

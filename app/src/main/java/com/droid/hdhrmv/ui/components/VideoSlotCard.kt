@@ -71,13 +71,18 @@ fun VideoSlotCard(
     onSlotFocused: () -> Unit = {},
     onChannelClick: () -> Unit,
     onMuteToggle: () -> Unit,
-    onFocusClick: () -> Unit
+    onFocusClick: () -> Unit,
+    isTopBarFocused: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isDpadFocused by interactionSource.collectIsFocusedAsState()
 
     val isSlotActive = slot.isFocused || isDpadFocused
-    val borderColor = if (isSlotActive) BorderFocused else Color(0x33334155)
+    val borderColor = when {
+        isSlotActive && isTopBarFocused -> Color(0x6638BDF8)
+        isSlotActive -> BorderFocused
+        else -> Color(0x33334155)
+    }
     val borderWidth = if (isSlotActive) 3.dp else 0.5.dp
 
     var showControls by remember { mutableStateOf(true) }
