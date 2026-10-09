@@ -129,8 +129,27 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val focusedSlot = viewModel.uiState.value.focusedSlotIndex
+        val currentState = viewModel.uiState.value
+        val focusedSlot = currentState.focusedSlotIndex
+
+        // If an overlay dialog is open, let dialog handle navigation keys
+        if (currentState.isChannelPickerOpen || currentState.slotActionTargetSlot != null) {
+            return super.onKeyDown(keyCode, event)
+        }
+
         when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (currentState.multiviewMode == com.droid.hdhrmv.model.MultiviewMode.FULLSCREEN) {
+                    viewModel.selectPreviousSlot()
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (currentState.multiviewMode == com.droid.hdhrmv.model.MultiviewMode.FULLSCREEN) {
+                    viewModel.selectNextSlot()
+                    return true
+                }
+            }
             KeyEvent.KEYCODE_CHANNEL_UP -> {
                 viewModel.nextChannel(focusedSlot)
                 return true
@@ -144,7 +163,7 @@ class MainActivity : ComponentActivity() {
                 return true
             }
             KeyEvent.KEYCODE_MENU -> {
-                viewModel.cycleLayoutMode()
+                viewModel.openSlotActions(focusedSlot)
                 return true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,

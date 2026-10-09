@@ -11,8 +11,8 @@ android {
         applicationId = "com.jay0lee.hdhrmultiview"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.1.1"
+        versionCode = 13
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -86,6 +86,10 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
+            all { test ->
+                test.systemProperty("user.home", rootProject.file("build/home").absolutePath)
+                test.systemProperty("robolectric.dependency.dir", rootProject.file("build/robolectric-libs").absolutePath)
+            }
         }
     }
 }

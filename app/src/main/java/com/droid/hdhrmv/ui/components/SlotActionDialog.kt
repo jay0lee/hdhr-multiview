@@ -36,6 +36,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import com.droid.hdhrmv.model.SlotState
 import com.droid.hdhrmv.ui.theme.AccentAmber
 import com.droid.hdhrmv.ui.theme.AccentGreen
@@ -57,6 +61,14 @@ fun SlotActionDialog(
     onDismiss: () -> Unit
 ) {
     val channel = slot.channel
+    val firstActionFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(120)
+        try {
+            firstActionFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -109,6 +121,7 @@ fun SlotActionDialog(
                     title = "Change Channel",
                     subtitle = "Open channel lineup to tune another broadcast",
                     accentColor = PrimaryCyan,
+                    modifier = Modifier.focusRequester(firstActionFocusRequester),
                     onClick = onChangeChannel
                 )
 
@@ -158,16 +171,16 @@ private fun SlotActionButton(
     subtitle: String,
     accentColor: Color,
     compact: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .focusable(interactionSource = interactionSource),
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         color = if (isFocused) PrimaryCyan.copy(alpha = 0.22f) else SurfaceElevated,
         border = if (isFocused) BorderStroke(2.dp, BorderFocused) else BorderStroke(0.5.dp, Color(0x33334155))

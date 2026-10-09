@@ -1,12 +1,13 @@
 package com.droid.hdhrmv.ui.components
 
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -42,12 +43,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.util.UnstableApi
 import com.droid.hdhrmv.model.SlotState
 import com.droid.hdhrmv.ui.theme.AccentAmber
 import com.droid.hdhrmv.ui.theme.BorderFocused
@@ -58,13 +59,15 @@ import com.droid.hdhrmv.ui.theme.TextPrimary
 import com.droid.hdhrmv.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 
-@OptIn(UnstableApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VideoSlotCard(
     slot: SlotState,
     modifier: Modifier = Modifier,
     renderVideo: @Composable () -> Unit = {},
     onSlotClick: () -> Unit,
+    onSlotLongClick: () -> Unit = {},
+    onSlotFocused: () -> Unit = {},
     onChannelClick: () -> Unit,
     onMuteToggle: () -> Unit,
     onFocusClick: () -> Unit
@@ -74,9 +77,16 @@ fun VideoSlotCard(
 
     val isSlotActive = slot.isFocused || isDpadFocused
     val borderColor = if (isSlotActive) BorderFocused else Color(0x33334155)
-    val borderWidth = if (isSlotActive) 2.dp else 0.5.dp
+    val borderWidth = if (isSlotActive) 3.dp else 0.5.dp
 
     var showControls by remember { mutableStateOf(true) }
+
+    LaunchedEffect(isDpadFocused) {
+        if (isDpadFocused) {
+            showControls = true
+            onSlotFocused()
+        }
+    }
 
     LaunchedEffect(showControls) {
         if (showControls) {
@@ -89,10 +99,17 @@ fun VideoSlotCard(
         modifier = modifier
             .border(borderWidth, borderColor)
             .focusable(interactionSource = interactionSource)
-            .clickable {
-                showControls = !showControls
-                onSlotClick()
-            },
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    showControls = !showControls
+                    onSlotClick()
+                },
+                onLongClick = {
+                    onSlotLongClick()
+                }
+            ),
         color = Color.Black
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -265,7 +282,8 @@ fun VideoSlotCard(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clickable { onChannelClick() }
+                        .semantics(mergeDescendants = true) {}
+                        .clickable { onSlotClick() }
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -289,19 +307,21 @@ fun VideoSlotCard(
                         text = "Slot ${slot.slotIndex + 1}",
                         color = TextSecondary,
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable { onSlotClick() }
                     )
                     Spacer(modifier = Modifier.padding(2.dp))
-                    Button(
-                        onClick = onChannelClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyan),
-                        shape = RoundedCornerShape(6.dp)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = PrimaryCyan,
+                        modifier = Modifier.clickable { onSlotClick() }
                     ) {
                         Text(
                             text = "Choose Channel",
                             color = SurfaceDark,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                         )
                     }
                 }

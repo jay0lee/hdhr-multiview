@@ -96,7 +96,7 @@ fun FloatingTopBar(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "HDHR",
+                    text = "HDHR MultiView",
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp

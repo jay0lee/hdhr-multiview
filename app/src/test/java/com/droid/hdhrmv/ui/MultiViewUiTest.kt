@@ -32,7 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
-@Config(application = Application::class)
+@Config(application = Application::class, sdk = [34])
 @OptIn(ExperimentalCoroutinesApi::class)
 class MultiViewUiTest {
 
@@ -81,7 +81,7 @@ class MultiViewUiTest {
     }
 
     @Test
-    fun mainScreen_displaysTitleAndFourSlots() {
+    fun mainScreen_displaysTitleAndFourSlots() = runTest {
         composeTestRule.setContent {
             HDHRMultiViewTheme {
                 MainScreen(
@@ -90,6 +90,8 @@ class MultiViewUiTest {
                 )
             }
         }
+        advanceUntilIdle()
+        composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText("HDHR MultiView").assertIsDisplayed()
         composeTestRule.onNodeWithText("Slot 1").assertIsDisplayed()
@@ -128,7 +130,7 @@ class MultiViewUiTest {
     }
 
     @Test
-    fun mainScreen_clickingEmptySlot_opensChannelPicker() {
+    fun mainScreen_clickingEmptySlot_opensChannelPicker() = runTest {
         composeTestRule.setContent {
             HDHRMultiViewTheme {
                 MainScreen(
@@ -137,8 +139,12 @@ class MultiViewUiTest {
                 )
             }
         }
+        advanceUntilIdle()
+        composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText("Slot 1").performClick()
+        composeTestRule.waitForIdle()
+
         assertTrue(viewModel.uiState.value.isChannelPickerOpen)
         assertEquals(0, viewModel.uiState.value.channelPickerTargetSlot)
     }

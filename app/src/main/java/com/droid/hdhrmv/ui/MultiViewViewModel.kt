@@ -27,6 +27,7 @@ data class MultiViewUiState(
     val multiviewMode: MultiviewMode = MultiviewMode.GRID_4,
     val isChannelPickerOpen: Boolean = false,
     val channelPickerTargetSlot: Int? = null,
+    val slotActionTargetSlot: Int? = null,
     val errorMessage: String? = null
 )
 
@@ -212,5 +213,27 @@ class MultiViewViewModel(
         val currentMode = _uiState.value.multiviewMode
         val nextIndex = (modes.indexOf(currentMode) + 1) % modes.size
         setMultiviewMode(modes[nextIndex])
+    }
+
+    fun openSlotActions(slotIndex: Int) {
+        _uiState.update { it.copy(slotActionTargetSlot = slotIndex) }
+    }
+
+    fun closeSlotActions() {
+        _uiState.update { it.copy(slotActionTargetSlot = null) }
+    }
+
+    fun selectNextSlot() {
+        val total = MultiviewLayoutManager.MAX_SLOTS
+        val current = _uiState.value.focusedSlotIndex
+        val next = (current + 1) % total
+        setFocusedSlot(next)
+    }
+
+    fun selectPreviousSlot() {
+        val total = MultiviewLayoutManager.MAX_SLOTS
+        val current = _uiState.value.focusedSlotIndex
+        val prev = if (current - 1 < 0) total - 1 else current - 1
+        setFocusedSlot(prev)
     }
 }

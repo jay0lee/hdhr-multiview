@@ -77,16 +77,15 @@ fun MainScreen(
     var showCustomEngineDialog by remember { mutableStateOf(false) }
     var isSidePanelCollapsed by remember { mutableStateOf(false) }
     var showOverlaidHUD by remember { mutableStateOf(true) }
-    var slotActionTargetSlot by remember { mutableStateOf<Int?>(null) }
 
     // Intercept Back button on Google TV and mobile navigation
-    val isOverlayOpen = state.isChannelPickerOpen || showManualIpDialog || showCustomEngineDialog || slotActionTargetSlot != null
+    val isOverlayOpen = state.isChannelPickerOpen || showManualIpDialog || showCustomEngineDialog || state.slotActionTargetSlot != null
     BackHandler(enabled = isOverlayOpen || state.multiviewMode == MultiviewMode.FULLSCREEN || showOverlaidHUD) {
         when {
             state.isChannelPickerOpen -> viewModel.closeChannelPicker()
             showManualIpDialog -> showManualIpDialog = false
             showCustomEngineDialog -> showCustomEngineDialog = false
-            slotActionTargetSlot != null -> slotActionTargetSlot = null
+            state.slotActionTargetSlot != null -> viewModel.closeSlotActions()
             state.multiviewMode == MultiviewMode.FULLSCREEN -> viewModel.setMultiviewMode(MultiviewMode.GRID_4)
             showOverlaidHUD -> showOverlaidHUD = false
         }
@@ -152,13 +151,24 @@ fun MainScreen(
                         playerController.VideoView(slotIndex, Modifier.fillMaxSize())
                     },
                     onSlotClick = { slotIndex ->
-                        viewModel.setFocusedSlot(slotIndex)
-                        val slot = state.slots.getOrNull(slotIndex)
-                        if (slot?.channel == null) {
-                            viewModel.openChannelPicker(slotIndex)
+                        if (state.multiviewMode == MultiviewMode.FULLSCREEN) {
+                            // In fullscreen mode, clicking returns to 4-quadrant grid
+                            viewModel.setMultiviewMode(MultiviewMode.GRID_4)
                         } else {
-                            slotActionTargetSlot = slotIndex
+                            val slot = state.slots.getOrNull(slotIndex)
+                            if (slot?.channel == null) {
+                                viewModel.openChannelPicker(slotIndex)
+                            } else if (state.focusedSlotIndex == slotIndex) {
+                                // Already focused slot: expand to Fullscreen
+                                viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
+                            } else {
+                                // Focus slot and route audio to it
+                                viewModel.setFocusedSlot(slotIndex)
+                            }
                         }
+                    },
+                    onSlotLongClick = { slotIndex ->
+                        viewModel.openSlotActions(slotIndex)
                     },
                     onChannelClick = { slotIndex ->
                         viewModel.setFocusedSlot(slotIndex)
@@ -256,39 +266,36 @@ fun MainScreen(
         }
 
         // Slot Actions Dialog for remote/TV and mobile slot management
-        if (slotActionTargetSlot != null) {
-            val actionSlot = state.slots.getOrNull(slotActionTargetSlot!!)
+        if (state.slotActionTargetSlot != null) {
+            val target = state.slotActionTargetSlot!!
+            val actionSlot = state.slots.getOrNull(target)
             if (actionSlot != null) {
                 SlotActionDialog(
                     slot = actionSlot,
                     isFullscreen = state.multiviewMode == MultiviewMode.FULLSCREEN,
                     onChangeChannel = {
-                        val target = slotActionTargetSlot!!
-                        slotActionTargetSlot = null
+                        viewModel.closeSlotActions()
                         viewModel.openChannelPicker(target)
                     },
                     onToggleAudio = {
-                        val target = slotActionTargetSlot!!
                         viewModel.toggleSlotMute(target)
-                        slotActionTargetSlot = null
+                        viewModel.closeSlotActions()
                     },
                     onToggleFullscreen = {
-                        val target = slotActionTargetSlot!!
                         viewModel.setFocusedSlot(target)
                         if (state.multiviewMode == MultiviewMode.FULLSCREEN) {
                             viewModel.setMultiviewMode(MultiviewMode.GRID_4)
                         } else {
                             viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
                         }
-                        slotActionTargetSlot = null
+                        viewModel.closeSlotActions()
                     },
                     onClearSlot = {
-                        val target = slotActionTargetSlot!!
                         viewModel.clearSlot(target)
-                        slotActionTargetSlot = null
+                        viewModel.closeSlotActions()
                     },
                     onDismiss = {
-                        slotActionTargetSlot = null
+                        viewModel.closeSlotActions()
                     }
                 )
             }

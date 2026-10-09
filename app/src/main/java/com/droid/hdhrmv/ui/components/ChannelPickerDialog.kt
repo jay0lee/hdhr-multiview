@@ -37,18 +37,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droid.hdhrmv.model.Channel
 import com.droid.hdhrmv.ui.theme.AccentAmber
+import com.droid.hdhrmv.ui.theme.BorderFocused
 import com.droid.hdhrmv.ui.theme.PrimaryCyan
 import com.droid.hdhrmv.ui.theme.SurfaceDark
 import com.droid.hdhrmv.ui.theme.SurfaceElevated
 import com.droid.hdhrmv.ui.theme.TextPrimary
 import com.droid.hdhrmv.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 
 @Composable
 fun ChannelPickerDialog(
@@ -60,11 +68,23 @@ fun ChannelPickerDialog(
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var showSearchField by remember { mutableStateOf(false) }
+    val firstItemFocusRequester = remember { FocusRequester() }
+
     val filteredChannels = remember(channels, searchQuery) {
         if (searchQuery.isBlank()) channels
         else channels.filter {
             it.guideNumber.contains(searchQuery, ignoreCase = true) ||
             it.guideName.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    LaunchedEffect(filteredChannels) {
+        if (filteredChannels.isNotEmpty() && !showSearchField) {
+            delay(100)
+            try {
+                firstItemFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
     }
 
@@ -82,43 +102,58 @@ fun ChannelPickerDialog(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
-                TextButton(onClick = onClearSlot) {
-                    Icon(
-                        imageVector = Icons.Default.Clear,
-                        contentDescription = "Clear Slot",
-                        tint = AccentAmber,
-                        modifier = Modifier.size(16.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showSearchField = !showSearchField },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = if (showSearchField) PrimaryCyan else TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Clear Slot", color = AccentAmber, fontSize = 13.sp)
+                    TextButton(onClick = onClearSlot) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Clear Slot",
+                            tint = AccentAmber,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Clear", color = AccentAmber, fontSize = 13.sp)
+                    }
                 }
             }
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Search field
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search channel…", color = TextSecondary) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = TextSecondary
+                // Search field (only shown if user explicitly taps the Search icon)
+                if (showSearchField) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search channel…", color = TextSecondary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = TextSecondary
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = PrimaryCyan,
+                            unfocusedBorderColor = SurfaceElevated
                         )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = PrimaryCyan,
-                        unfocusedBorderColor = SurfaceElevated
                     )
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
                 val effectiveIp = deviceIp ?: "10.1.0.4"
                 if (filteredChannels.isEmpty()) {
@@ -164,7 +199,7 @@ fun ChannelPickerDialog(
                                 "29.1" to "WTXFDT (FOX)"
                             )
                             LazyColumn(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                                items(presets) { (num, name) ->
+                                itemsIndexed(presets) { index, (num, name) ->
                                     ChannelRow(
                                         channel = Channel(
                                             guideNumber = num,
@@ -172,6 +207,7 @@ fun ChannelPickerDialog(
                                             isHd = true,
                                             streamUrl = "http://$effectiveIp:5004/auto/v$num"
                                         ),
+                                        modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier,
                                         onClick = {
                                             onChannelSelected(
                                                 Channel(
@@ -193,9 +229,10 @@ fun ChannelPickerDialog(
                             .fillMaxWidth()
                             .height(320.dp)
                     ) {
-                        items(filteredChannels, key = { it.guideNumber }) { channel ->
+                        itemsIndexed(filteredChannels, key = { _, ch -> ch.guideNumber }) { index, channel ->
                             ChannelRow(
                                 channel = channel,
+                                modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier,
                                 onClick = { onChannelSelected(channel) }
                             )
                         }
@@ -218,19 +255,28 @@ fun ChannelPickerDialog(
 @Composable
 private fun ChannelRow(
     channel: Channel,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick)
-            .focusable(interactionSource = interactionSource),
-        color = if (isFocused) PrimaryCyan.copy(alpha = 0.2f) else SurfaceElevated
+            .border(
+                width = if (isFocused) 3.dp else 0.5.dp,
+                color = if (isFocused) BorderFocused else Color(0x33334155),
+                shape = RoundedCornerShape(6.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        color = if (isFocused) PrimaryCyan.copy(alpha = 0.28f) else SurfaceElevated
     ) {
         Row(
             modifier = Modifier

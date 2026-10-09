@@ -17,10 +17,14 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
@@ -51,6 +55,7 @@ fun MultiviewContainer(
     focusedSlotIndex: Int,
     renderVideo: @Composable (Int) -> Unit = {},
     onSlotClick: (Int) -> Unit,
+    onSlotLongClick: (Int) -> Unit = {},
     onChannelClick: (Int) -> Unit,
     onMuteToggle: (Int) -> Unit,
     onFocusClick: (Int) -> Unit,
@@ -65,8 +70,11 @@ fun MultiviewContainer(
             MultiviewMode.GRID_4 -> {
                 Grid4Layout(
                     slots = slots,
+                    focusedIndex = focusedSlotIndex,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
+                    onSlotLongClick = onSlotLongClick,
+                    onSlotSelected = onSlotSelected,
                     onChannelClick = onChannelClick,
                     onMuteToggle = onMuteToggle,
                     onFocusClick = onFocusClick
@@ -78,6 +86,8 @@ fun MultiviewContainer(
                     focusedIndex = focusedSlotIndex,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
+                    onSlotLongClick = onSlotLongClick,
+                    onSlotSelected = onSlotSelected,
                     onChannelClick = onChannelClick,
                     onMuteToggle = onMuteToggle,
                     onFocusClick = onFocusClick
@@ -89,6 +99,8 @@ fun MultiviewContainer(
                     focusedIndex = focusedSlotIndex,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
+                    onSlotLongClick = onSlotLongClick,
+                    onSlotSelected = onSlotSelected,
                     onChannelClick = onChannelClick,
                     onMuteToggle = onMuteToggle,
                     onFocusClick = onFocusClick
@@ -99,6 +111,7 @@ fun MultiviewContainer(
                     slot = slots.getOrNull(focusedSlotIndex) ?: slots[0],
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
+                    onSlotLongClick = onSlotLongClick,
                     onChannelClick = onChannelClick,
                     onMuteToggle = onMuteToggle,
                     onFocusClick = onFocusClick
@@ -110,6 +123,7 @@ fun MultiviewContainer(
                     focusedIndex = focusedSlotIndex,
                     renderVideo = renderVideo,
                     onSlotClick = onSlotClick,
+                    onSlotLongClick = onSlotLongClick,
                     onSlotSelected = onSlotSelected,
                     onChannelClick = onChannelClick,
                     onMuteToggle = onMuteToggle,
@@ -123,12 +137,25 @@ fun MultiviewContainer(
 @Composable
 private fun Grid4Layout(
     slots: List<SlotState>,
+    focusedIndex: Int,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
+    onSlotLongClick: (Int) -> Unit,
+    onSlotSelected: (Int) -> Unit,
     onChannelClick: (Int) -> Unit,
     onMuteToggle: (Int) -> Unit,
     onFocusClick: (Int) -> Unit
 ) {
+    val focusRequesters = remember { List(4) { FocusRequester() } }
+
+    LaunchedEffect(focusedIndex) {
+        if (focusedIndex in 0 until 4) {
+            try {
+                focusRequesters[focusedIndex].requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -169,11 +196,47 @@ private fun Grid4Layout(
                     val slot = slots.getOrNull(index)
                     if (slot != null) {
                         key(index) {
+                            val slotFocusModifier = if (isStack) {
+                                Modifier
+                                    .fillMaxSize()
+                                    .focusRequester(focusRequesters[index])
+                                    .focusProperties {
+                                        if (index > 0) up = focusRequesters[index - 1]
+                                        if (index < 3) down = focusRequesters[index + 1]
+                                    }
+                            } else {
+                                Modifier
+                                    .fillMaxSize()
+                                    .focusRequester(focusRequesters[index])
+                                    .focusProperties {
+                                        when (index) {
+                                            0 -> {
+                                                right = focusRequesters[1]
+                                                down = focusRequesters[2]
+                                            }
+                                            1 -> {
+                                                left = focusRequesters[0]
+                                                down = focusRequesters[3]
+                                            }
+                                            2 -> {
+                                                up = focusRequesters[0]
+                                                right = focusRequesters[3]
+                                            }
+                                            3 -> {
+                                                up = focusRequesters[1]
+                                                left = focusRequesters[2]
+                                            }
+                                        }
+                                    }
+                            }
+
                             VideoSlotCard(
                                 slot = slot,
                                 renderVideo = { renderVideo(index) },
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = slotFocusModifier,
                                 onSlotClick = { onSlotClick(index) },
+                                onSlotLongClick = { onSlotLongClick(index) },
+                                onSlotFocused = { onSlotSelected(index) },
                                 onChannelClick = { onChannelClick(index) },
                                 onMuteToggle = { onMuteToggle(index) },
                                 onFocusClick = { onFocusClick(index) }
@@ -211,6 +274,8 @@ private fun Focus1Plus3Layout(
     focusedIndex: Int,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
+    onSlotLongClick: (Int) -> Unit,
+    onSlotSelected: (Int) -> Unit,
     onChannelClick: (Int) -> Unit,
     onMuteToggle: (Int) -> Unit,
     onFocusClick: (Int) -> Unit
@@ -239,6 +304,8 @@ private fun Focus1Plus3Layout(
                 renderVideo = { renderVideo(primarySlot.slotIndex) },
                 modifier = Modifier.weight(3f).fillMaxHeight(),
                 onSlotClick = { onSlotClick(primarySlot.slotIndex) },
+                onSlotLongClick = { onSlotLongClick(primarySlot.slotIndex) },
+                onSlotFocused = { onSlotSelected(primarySlot.slotIndex) },
                 onChannelClick = { onChannelClick(primarySlot.slotIndex) },
                 onMuteToggle = { onMuteToggle(primarySlot.slotIndex) },
                 onFocusClick = { onFocusClick(primarySlot.slotIndex) }
@@ -252,6 +319,8 @@ private fun Focus1Plus3Layout(
                         renderVideo = { renderVideo(slot.slotIndex) },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         onSlotClick = { onSlotClick(slot.slotIndex) },
+                        onSlotLongClick = { onSlotLongClick(slot.slotIndex) },
+                        onSlotFocused = { onSlotSelected(slot.slotIndex) },
                         onChannelClick = { onChannelClick(slot.slotIndex) },
                         onMuteToggle = { onMuteToggle(slot.slotIndex) },
                         onFocusClick = { onFocusClick(slot.slotIndex) }
@@ -268,6 +337,8 @@ private fun PipLayout(
     focusedIndex: Int,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
+    onSlotLongClick: (Int) -> Unit,
+    onSlotSelected: (Int) -> Unit,
     onChannelClick: (Int) -> Unit,
     onMuteToggle: (Int) -> Unit,
     onFocusClick: (Int) -> Unit
@@ -296,6 +367,8 @@ private fun PipLayout(
                 renderVideo = { renderVideo(primarySlot.slotIndex) },
                 modifier = Modifier.fillMaxSize(),
                 onSlotClick = { onSlotClick(primarySlot.slotIndex) },
+                onSlotLongClick = { onSlotLongClick(primarySlot.slotIndex) },
+                onSlotFocused = { onSlotSelected(primarySlot.slotIndex) },
                 onChannelClick = { onChannelClick(primarySlot.slotIndex) },
                 onMuteToggle = { onMuteToggle(primarySlot.slotIndex) },
                 onFocusClick = { onFocusClick(primarySlot.slotIndex) }
@@ -314,6 +387,8 @@ private fun PipLayout(
                     renderVideo = { renderVideo(secondarySlot.slotIndex) },
                     modifier = Modifier.fillMaxSize(),
                     onSlotClick = { onSlotClick(secondarySlot.slotIndex) },
+                    onSlotLongClick = { onSlotLongClick(secondarySlot.slotIndex) },
+                    onSlotFocused = { onSlotSelected(secondarySlot.slotIndex) },
                     onChannelClick = { onChannelClick(secondarySlot.slotIndex) },
                     onMuteToggle = { onMuteToggle(secondarySlot.slotIndex) },
                     onFocusClick = { onFocusClick(secondarySlot.slotIndex) }
@@ -328,10 +403,18 @@ private fun SingleFullscreenLayout(
     slot: SlotState,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
+    onSlotLongClick: (Int) -> Unit,
     onChannelClick: (Int) -> Unit,
     onMuteToggle: (Int) -> Unit,
     onFocusClick: (Int) -> Unit
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(slot.slotIndex) {
+        try {
+            focusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -348,8 +431,11 @@ private fun SingleFullscreenLayout(
         VideoSlotCard(
             slot = slot,
             renderVideo = { renderVideo(slot.slotIndex) },
-            modifier = Modifier.size(vidWidth, vidHeight),
+            modifier = Modifier
+                .size(vidWidth, vidHeight)
+                .focusRequester(focusRequester),
             onSlotClick = { onSlotClick(slot.slotIndex) },
+            onSlotLongClick = { onSlotLongClick(slot.slotIndex) },
             onChannelClick = { onChannelClick(slot.slotIndex) },
             onMuteToggle = { onMuteToggle(slot.slotIndex) },
             onFocusClick = { onFocusClick(slot.slotIndex) }
@@ -364,6 +450,7 @@ private fun CarouselLayout(
     focusedIndex: Int,
     renderVideo: @Composable (Int) -> Unit,
     onSlotClick: (Int) -> Unit,
+    onSlotLongClick: (Int) -> Unit,
     onSlotSelected: (Int) -> Unit,
     onChannelClick: (Int) -> Unit,
     onMuteToggle: (Int) -> Unit,
@@ -458,6 +545,7 @@ private fun CarouselLayout(
                                 onSlotClick(slot.slotIndex)
                             }
                         },
+                        onSlotLongClick = { onSlotLongClick(slot.slotIndex) },
                         onChannelClick = { onChannelClick(slot.slotIndex) },
                         onMuteToggle = { onMuteToggle(slot.slotIndex) },
                         onFocusClick = {
