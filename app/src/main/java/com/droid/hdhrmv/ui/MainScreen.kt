@@ -281,9 +281,23 @@ fun MainScreen(
             val target = state.slotActionTargetSlot!!
             val actionSlot = state.slots.getOrNull(target)
             if (actionSlot != null) {
+                var currentTrackName by remember(target) {
+                    mutableStateOf(
+                        playerController.getAudioTracks(target).firstOrNull {
+                            it.first == playerController.getSelectedAudioTrack(target)
+                        }?.second ?: playerController.getAudioTracks(target).firstOrNull()?.second
+                    )
+                }
                 SlotActionDialog(
                     slot = actionSlot,
                     isFullscreen = state.multiviewMode == MultiviewMode.FULLSCREEN,
+                    currentAudioTrackName = currentTrackName,
+                    onCycleAudioTrack = {
+                        val newTrack = playerController.cycleAudioTrack(target)
+                        if (newTrack != null) {
+                            currentTrackName = newTrack
+                        }
+                    },
                     onChangeChannel = {
                         viewModel.closeSlotActions()
                         viewModel.openChannelPicker(target)

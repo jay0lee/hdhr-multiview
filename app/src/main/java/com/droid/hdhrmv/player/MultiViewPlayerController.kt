@@ -50,6 +50,10 @@ interface MultiViewPlayerController {
     fun release()
     fun getPlayer(slotIndex: Int): ExoPlayer? = null
     fun getDecoderBadge(slotIndex: Int): String = "HW • MediaCodec"
+    fun getAudioTracks(slotIndex: Int): List<Pair<Int, String>> = emptyList()
+    fun getSelectedAudioTrack(slotIndex: Int): Int = -1
+    fun selectAudioTrack(slotIndex: Int, trackId: Int) {}
+    fun cycleAudioTrack(slotIndex: Int): String? = null
 }
 
 @OptIn(UnstableApi::class)

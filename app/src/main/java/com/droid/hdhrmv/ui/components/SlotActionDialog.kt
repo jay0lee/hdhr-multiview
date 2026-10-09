@@ -54,6 +54,8 @@ import com.droid.hdhrmv.ui.theme.TextSecondary
 fun SlotActionDialog(
     slot: SlotState,
     isFullscreen: Boolean,
+    currentAudioTrackName: String? = null,
+    onCycleAudioTrack: (() -> Unit)? = null,
     onChangeChannel: () -> Unit,
     onToggleAudio: () -> Unit,
     onToggleFullscreen: () -> Unit,
@@ -133,6 +135,16 @@ fun SlotActionDialog(
                     onClick = onToggleAudio
                 )
 
+                if (onCycleAudioTrack != null && !currentAudioTrackName.isNullOrBlank()) {
+                    SlotActionButton(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        title = "Audio Track: $currentAudioTrackName",
+                        subtitle = "Cycle available broadcast audio tracks (e.g. English / Spanish / SAP)",
+                        accentColor = PrimaryCyan,
+                        onClick = onCycleAudioTrack
+                    )
+                }
+
                 SlotActionButton(
                     icon = Icons.Default.Fullscreen,
                     title = if (isFullscreen) "Exit Fullscreen (Grid View)" else "Fullscreen View",
@@ -164,6 +176,15 @@ fun SlotActionDialog(
                         ) {
                             Text(text = "Video Decoder", color = TextSecondary, fontSize = 11.sp)
                             Text(text = "Hardware (MediaCodec)", color = Color(0xFF34D399), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Audio Output", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "Stereo Downmix (AudioTrack)", color = PrimaryCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(

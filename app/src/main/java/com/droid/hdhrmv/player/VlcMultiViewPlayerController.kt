@@ -30,6 +30,10 @@ class VlcMultiViewPlayerController(
             "--audio-resampler=soxr",
             "--deinterlace=1",
             "--deinterlace-mode=blend",
+            "--aout=android_audiotrack",
+            "--no-audio-passthrough",
+            "--stereo-mode=1",
+            "--no-mediacodec-audio",
             "-v"
         )
         LibVLC(context.applicationContext, options)
@@ -43,12 +47,15 @@ class VlcMultiViewPlayerController(
         var player = mediaPlayers[slotIndex]
         if (player == null) {
             player = MediaPlayer(libVlc).apply {
+                setAudioOutput("android_audiotrack")
+                setAudioDigitalOutputEnabled(false)
                 setEventListener { event ->
                     when (event.type) {
                         MediaPlayer.Event.Playing -> {
                             val isMuted = slotMutedStates[slotIndex]
                             volume = if (isMuted) 0 else 100
-                            Log.i(TAG, "Slot $slotIndex VLC Event: Playing (volume=$volume, muted=$isMuted, decoder=${getDecoderBadge(slotIndex)})")
+                            ensureAudioTrackSelected(slotIndex, this)
+                            Log.i(TAG, "Slot $slotIndex VLC Event: Playing (volume=$volume, muted=$isMuted, audioTrack=$audioTrack, decoder=${getDecoderBadge(slotIndex)})")
                             onPlaybackStateChanged(slotIndex, true, false, null)
                         }
                         MediaPlayer.Event.Buffering -> {
@@ -64,12 +71,36 @@ class VlcMultiViewPlayerController(
                             Log.d(TAG, "Slot $slotIndex VLC Event: Stopped")
                             onPlaybackStateChanged(slotIndex, false, false, null)
                         }
+                        MediaPlayer.Event.ESAdded -> {
+                            if (event.esChangedType == 1) { // 1 == IMedia.Track.Type.Audio
+                                Log.i(TAG, "Slot $slotIndex VLC Event: Audio track added id=${event.esChangedID}")
+                                ensureAudioTrackSelected(slotIndex, this)
+                            }
+                        }
+                        MediaPlayer.Event.ESSelected -> {
+                            if (event.esChangedType == 1) {
+                                Log.i(TAG, "Slot $slotIndex VLC Event: Audio track selected id=${event.esChangedID}")
+                            }
+                        }
                     }
                 }
             }
             mediaPlayers[slotIndex] = player
         }
         return player
+    }
+
+    private fun ensureAudioTrackSelected(slotIndex: Int, player: MediaPlayer) {
+        val currentTrack = player.audioTrack
+        val tracks = player.audioTracks
+        Log.i(TAG, "Slot $slotIndex Audio state: currentTrack=$currentTrack, available=${tracks?.joinToString { "[${it.id}:${it.name}]" }}")
+        if (currentTrack == -1 && !tracks.isNullOrEmpty()) {
+            val validTrack = tracks.firstOrNull { it.id > 0 } ?: tracks.firstOrNull { it.id != -1 }
+            if (validTrack != null) {
+                player.audioTrack = validTrack.id
+                Log.i(TAG, "Slot $slotIndex auto-selected audio track ${validTrack.id}: ${validTrack.name}")
+            }
+        }
     }
 
     private fun safelyAttach(slotIndex: Int) {
@@ -114,9 +145,14 @@ class VlcMultiViewPlayerController(
 
         try {
             val media = Media(libVlc, Uri.parse(streamUrl)).apply {
-                // Force MediaCodec hardware acceleration (second arg = true forces HW decoding for MPEG-2)
+                // Force MediaCodec hardware acceleration for video (second arg = true forces HW decoding for MPEG-2)
                 setHWDecoderEnabled(true, true)
-                addOption(":codec=mediacodec_ndk,mediacodec_jni,all")
+                // Disable MediaCodec for audio so LibVLC's software decoder downmixes 5.1 surround sound to stereo PCM
+                addOption(":no-mediacodec-audio")
+                // Disable raw digital audio passthrough to prevent HDMI handshake silence on TVs
+                addOption(":no-audio-passthrough")
+                // Force stereo downmix
+                addOption(":stereo-mode=1")
                 addOption(":network-caching=1000")
                 addOption(":live-caching=1000")
                 addOption(":deinterlace=1")
@@ -204,7 +240,42 @@ class VlcMultiViewPlayerController(
         slotMutedStates[slotIndex] = isMuted
         val player = mediaPlayers[slotIndex] ?: return
         player.volume = if (isMuted) 0 else 100
+        if (!isMuted) {
+            ensureAudioTrackSelected(slotIndex, player)
+        }
         Log.d(TAG, "Slot $slotIndex setMuted: $isMuted (player.volume=${player.volume})")
+    }
+
+    override fun getAudioTracks(slotIndex: Int): List<Pair<Int, String>> {
+        if (slotIndex !in 0..3) return emptyList()
+        val player = mediaPlayers[slotIndex] ?: return emptyList()
+        return player.audioTracks?.filter { it.id > 0 }?.map { it.id to it.name } ?: emptyList()
+    }
+
+    override fun getSelectedAudioTrack(slotIndex: Int): Int {
+        if (slotIndex !in 0..3) return -1
+        return mediaPlayers[slotIndex]?.audioTrack ?: -1
+    }
+
+    override fun selectAudioTrack(slotIndex: Int, trackId: Int) {
+        if (slotIndex !in 0..3) return
+        val player = mediaPlayers[slotIndex] ?: return
+        player.audioTrack = trackId
+        Log.i(TAG, "Slot $slotIndex manually selected audio track $trackId")
+    }
+
+    override fun cycleAudioTrack(slotIndex: Int): String? {
+        if (slotIndex !in 0..3) return null
+        val player = mediaPlayers[slotIndex] ?: return null
+        val tracks = player.audioTracks?.filter { it.id > 0 } ?: return null
+        if (tracks.isEmpty()) return null
+        val current = player.audioTrack
+        val currentIndex = tracks.indexOfFirst { it.id == current }
+        val nextIndex = if (currentIndex < 0 || currentIndex >= tracks.size - 1) 0 else currentIndex + 1
+        val nextTrack = tracks[nextIndex]
+        player.audioTrack = nextTrack.id
+        Log.i(TAG, "Slot $slotIndex cycled audio track to ${nextTrack.id} (${nextTrack.name})")
+        return nextTrack.name
     }
 
     override fun attachVideoLayout(slotIndex: Int, layout: VLCVideoLayout) {
