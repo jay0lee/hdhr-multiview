@@ -24,9 +24,6 @@ object AudioTranscodeManager {
     )
 
     fun isTranscodeRequired(channel: Channel): Boolean {
-        // Digital sub-channels (virtual channel >= 100) or non-standard audio formats
-        val guideNum = channel.guideNumber.toDoubleOrNull()
-        if (guideNum != null && guideNum >= 100.0) return true
         val videoCodec = channel.videoCodec?.uppercase() ?: ""
         if (videoCodec.contains("HEVC") || videoCodec.contains("H.265")) return true
         val audioCodec = channel.audioCodec?.uppercase() ?: ""
@@ -128,8 +125,8 @@ object AudioTranscodeManager {
 
     @Synchronized
     fun getStreamUrlForSlot(context: Context, slotIndex: Int, channel: Channel): String {
-        if (!isTranscodeRequired(channel)) {
-            // Standard broadcast (MPEG-2 / AC-3): stream directly without transcoding
+        if (!isCustomBinaryActive(context) || !isTranscodeRequired(channel)) {
+            // Direct playback without transcoding
             stopTranscode(slotIndex)
             return channel.streamUrl
         }

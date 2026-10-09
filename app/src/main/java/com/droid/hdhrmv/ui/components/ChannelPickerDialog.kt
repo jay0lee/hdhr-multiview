@@ -43,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -81,7 +82,11 @@ fun ChannelPickerDialog(
 
     LaunchedEffect(filteredChannels) {
         if (filteredChannels.isNotEmpty() && !showSearchField) {
-            delay(100)
+            delay(50)
+            try {
+                firstItemFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+            delay(150)
             try {
                 firstItemFocusRequester.requestFocus()
             } catch (_: Exception) {}
@@ -105,7 +110,9 @@ fun ChannelPickerDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { showSearchField = !showSearchField },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier
+                            .size(32.dp)
+                            .focusProperties { canFocus = showSearchField }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
@@ -271,6 +278,7 @@ private fun ChannelRow(
                 color = if (isFocused) BorderFocused else Color(0x33334155),
                 shape = RoundedCornerShape(6.dp)
             )
+            .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

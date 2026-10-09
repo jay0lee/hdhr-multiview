@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.droid.hdhrmv.data.DefaultHdHomeRunNetworkClient
 import com.droid.hdhrmv.data.HdHomeRunRepository
+import com.droid.hdhrmv.model.MultiviewMode
 import com.droid.hdhrmv.player.MultiViewPlayerController
 import com.droid.hdhrmv.player.VlcMultiViewPlayerController
 import com.droid.hdhrmv.ui.theme.HDHRMultiViewTheme
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         enableImmersiveFullscreen()
 
         // Google TV / Android TV detection: lock to landscape for TV, allow adaptive rotation for phones/tablets
@@ -139,14 +141,99 @@ class MainActivity : ComponentActivity() {
 
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (currentState.multiviewMode == com.droid.hdhrmv.model.MultiviewMode.FULLSCREEN) {
-                    viewModel.selectPreviousSlot()
-                    return true
+                when (currentState.multiviewMode) {
+                    MultiviewMode.FULLSCREEN -> {
+                        viewModel.selectPreviousSlot()
+                        return true
+                    }
+                    MultiviewMode.GRID_4 -> {
+                        when (focusedSlot) {
+                            1 -> viewModel.setFocusedSlot(0)
+                            3 -> viewModel.setFocusedSlot(2)
+                            0 -> viewModel.setFocusedSlot(1)
+                            2 -> viewModel.setFocusedSlot(3)
+                        }
+                        return true
+                    }
+                    else -> {
+                        viewModel.selectPreviousSlot()
+                        return true
+                    }
                 }
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (currentState.multiviewMode == com.droid.hdhrmv.model.MultiviewMode.FULLSCREEN) {
-                    viewModel.selectNextSlot()
+                when (currentState.multiviewMode) {
+                    MultiviewMode.FULLSCREEN -> {
+                        viewModel.selectNextSlot()
+                        return true
+                    }
+                    MultiviewMode.GRID_4 -> {
+                        when (focusedSlot) {
+                            0 -> viewModel.setFocusedSlot(1)
+                            2 -> viewModel.setFocusedSlot(3)
+                            1 -> viewModel.setFocusedSlot(0)
+                            3 -> viewModel.setFocusedSlot(2)
+                        }
+                        return true
+                    }
+                    else -> {
+                        viewModel.selectNextSlot()
+                        return true
+                    }
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                when (currentState.multiviewMode) {
+                    MultiviewMode.FULLSCREEN -> {
+                        viewModel.setMultiviewMode(MultiviewMode.GRID_4)
+                        return true
+                    }
+                    MultiviewMode.GRID_4 -> {
+                        when (focusedSlot) {
+                            2 -> viewModel.setFocusedSlot(0)
+                            3 -> viewModel.setFocusedSlot(1)
+                            else -> viewModel.selectPreviousSlot()
+                        }
+                        return true
+                    }
+                    else -> {
+                        viewModel.selectPreviousSlot()
+                        return true
+                    }
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                when (currentState.multiviewMode) {
+                    MultiviewMode.FULLSCREEN -> {
+                        viewModel.setMultiviewMode(MultiviewMode.GRID_4)
+                        return true
+                    }
+                    MultiviewMode.GRID_4 -> {
+                        when (focusedSlot) {
+                            0 -> viewModel.setFocusedSlot(2)
+                            1 -> viewModel.setFocusedSlot(3)
+                            else -> viewModel.selectNextSlot()
+                        }
+                        return true
+                    }
+                    else -> {
+                        viewModel.selectNextSlot()
+                        return true
+                    }
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                val currentSlot = currentState.slots.getOrNull(focusedSlot)
+                if (currentState.multiviewMode == MultiviewMode.FULLSCREEN) {
+                    viewModel.setMultiviewMode(MultiviewMode.GRID_4)
+                    return true
+                } else if (currentSlot?.channel == null) {
+                    viewModel.openChannelPicker(focusedSlot)
+                    return true
+                } else {
+                    viewModel.setMultiviewMode(MultiviewMode.FULLSCREEN)
                     return true
                 }
             }
@@ -158,11 +245,13 @@ class MainActivity : ComponentActivity() {
                 viewModel.previousChannel(focusedSlot)
                 return true
             }
-            KeyEvent.KEYCODE_GUIDE -> {
+            KeyEvent.KEYCODE_GUIDE,
+            KeyEvent.KEYCODE_PROG_RED -> {
                 viewModel.openChannelPicker(focusedSlot)
                 return true
             }
-            KeyEvent.KEYCODE_MENU -> {
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_INFO -> {
                 viewModel.openSlotActions(focusedSlot)
                 return true
             }

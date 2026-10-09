@@ -24,14 +24,13 @@ class VlcMultiViewPlayerController(
 
     private val libVlc: LibVLC by lazy {
         val options = arrayListOf(
-            "--aout=android_audiotrack",
-            "--no-spdif",
-            "--spdif=0",
-            "--audio-time-stretch",
             "--no-drop-late-frames",
             "--no-skip-frames",
             "--network-caching=500",
-            "--live-caching=500"
+            "--live-caching=500",
+            "--audio-time-stretch",
+            "--audio-resampler=soxr",
+            "-v"
         )
         LibVLC(context.applicationContext, options)
     }
@@ -40,40 +39,17 @@ class VlcMultiViewPlayerController(
     private val activeUrls = arrayOfNulls<String>(4)
     private val activeLayouts = arrayOfNulls<VLCVideoLayout>(4)
 
-    private fun ensureAudioTrack(slotIndex: Int, player: MediaPlayer) {
-        try {
-            val tracks = player.audioTracks
-            val currentTrack = player.audioTrack
-            val validTracks = tracks?.filter { it.id > 0 } ?: emptyList()
-            if (validTracks.isNotEmpty() && (currentTrack <= 0 || validTracks.none { it.id == currentTrack })) {
-                val selected = validTracks.first()
-                player.audioTrack = selected.id
-                Log.i(TAG, "Slot $slotIndex selected valid audio track: ${selected.id} (${selected.name})")
-            }
-            val isMuted = slotMutedStates[slotIndex]
-            player.volume = if (isMuted) 0 else 100
-        } catch (e: Exception) {
-            Log.w(TAG, "Slot $slotIndex error ensuring audio track: ${e.message}")
-        }
-    }
-
     private fun getOrCreatePlayer(slotIndex: Int): MediaPlayer {
         var player = mediaPlayers[slotIndex]
         if (player == null) {
             player = MediaPlayer(libVlc).apply {
-                setAudioOutput("android_audiotrack")
-                setAudioDigitalOutputEnabled(false)
                 setEventListener { event ->
                     when (event.type) {
                         MediaPlayer.Event.Playing -> {
                             val isMuted = slotMutedStates[slotIndex]
                             volume = if (isMuted) 0 else 100
-                            ensureAudioTrack(slotIndex, this)
-                            Log.i(TAG, "Slot $slotIndex VLC Event: Playing (volume=$volume, muted=$isMuted, track=$audioTrack)")
+                            Log.i(TAG, "Slot $slotIndex VLC Event: Playing (volume=$volume, muted=$isMuted)")
                             onPlaybackStateChanged(slotIndex, true, false, null)
-                        }
-                        MediaPlayer.Event.ESAdded -> {
-                            ensureAudioTrack(slotIndex, this)
                         }
                         MediaPlayer.Event.Buffering -> {
                             val buffering = event.buffering < 100f
@@ -130,7 +106,7 @@ class VlcMultiViewPlayerController(
 
     override fun play(slotIndex: Int, streamUrl: String) {
         if (slotIndex !in 0..3) return
-        if (activeUrls[slotIndex] == streamUrl && mediaPlayers[slotIndex]?.isPlaying == true) {
+        if (activeUrls[slotIndex] == streamUrl && mediaPlayers[slotIndex] != null) {
             return
         }
         activeUrls[slotIndex] = streamUrl
@@ -143,9 +119,6 @@ class VlcMultiViewPlayerController(
                 addOption(":live-caching=500")
                 addOption(":clock-jitter=0")
                 addOption(":clock-synchro=0")
-                addOption(":aout=android_audiotrack")
-                addOption(":no-spdif")
-                addOption(":spdif=0")
             }
             player.media = media
             media.release()

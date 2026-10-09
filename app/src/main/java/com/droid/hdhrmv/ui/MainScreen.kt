@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
@@ -137,6 +138,7 @@ fun MainScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .focusProperties { canFocus = false }
                     .clickable {
                         // Tapping toggles HUD
                         showOverlaidHUD = !showOverlaidHUD
@@ -336,6 +338,7 @@ fun MainScreen(
                 deviceIp = state.selectedDevice?.ipAddress,
                 onChannelSelected = { channel ->
                     viewModel.setChannelForSlot(slotIndex, channel)
+                    viewModel.setFocusedSlot(slotIndex)
                 },
                 onClearSlot = {
                     viewModel.setChannelForSlot(slotIndex, null)
