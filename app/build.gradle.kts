@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.droid.hdhrmv"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.jay0lee.hdhrmultiview"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 11
-        versionName = "1.1.0"
+        targetSdk = 36
+        versionCode = 12
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
