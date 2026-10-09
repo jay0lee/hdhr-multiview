@@ -125,29 +125,39 @@ object AudioTranscodeManager {
 
     @Synchronized
     fun getStreamUrlForSlot(context: Context, slotIndex: Int, channel: Channel): String {
-        if (!isCustomBinaryActive(context) || !isTranscodeRequired(channel)) {
-            // Direct playback without transcoding
+        return try {
+            if (!isCustomBinaryActive(context) || !isTranscodeRequired(channel)) {
+                // Direct playback without transcoding
+                stopTranscode(slotIndex)
+                return channel.streamUrl
+            }
+
             stopTranscode(slotIndex)
-            return channel.streamUrl
+
+            val ffmpegBin = getFfmpegBinary(context)
+            if (!ffmpegBin.exists() || !ffmpegBin.canExecute()) {
+                Log.w(TAG, "Engine binary not executable; falling back to direct stream")
+                return channel.streamUrl
+            }
+
+            val serverSocket = ServerSocket(0, 5, java.net.InetAddress.getByName("127.0.0.1"))
+            val port = serverSocket.localPort
+
+            val session = TranscodeSession(serverSocket, port)
+            activeServers[slotIndex] = session
+
+            // Launch background server thread
+            Thread({
+                runTranscodeServer(session, ffmpegBin, channel.streamUrl, slotIndex)
+            }, "StreamTranscode-Slot$slotIndex").apply { isDaemon = true }.start()
+
+            val localUrl = "http://127.0.0.1:$port/live.ts"
+            Log.i(TAG, "Slot $slotIndex transcode proxy initialized at $localUrl for ${channel.guideNumber} ${channel.guideName}")
+            localUrl
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed initializing transcode proxy for slot $slotIndex: ${e.message}", e)
+            channel.streamUrl
         }
-
-        stopTranscode(slotIndex)
-
-        val ffmpegBin = getFfmpegBinary(context)
-        val serverSocket = ServerSocket(0, 5, java.net.InetAddress.getByName("127.0.0.1"))
-        val port = serverSocket.localPort
-
-        val session = TranscodeSession(serverSocket, port)
-        activeServers[slotIndex] = session
-
-        // Launch background server thread
-        Thread({
-            runTranscodeServer(session, ffmpegBin, channel.streamUrl, slotIndex)
-        }, "StreamTranscode-Slot$slotIndex").apply { isDaemon = true }.start()
-
-        val localUrl = "http://127.0.0.1:$port/live.ts"
-        Log.i(TAG, "Slot $slotIndex transcode proxy initialized at $localUrl for ${channel.guideNumber} ${channel.guideName}")
-        return localUrl
     }
 
     private fun runTranscodeServer(session: TranscodeSession, ffmpegBin: File, sourceUrl: String, slotIndex: Int) {

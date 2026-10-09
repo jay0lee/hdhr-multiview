@@ -91,41 +91,47 @@ class VlcMultiViewPlayerController(
     }
 
     private fun ensureAudioTrackSelected(slotIndex: Int, player: MediaPlayer) {
-        val currentTrack = player.audioTrack
-        val tracks = player.audioTracks
-        Log.i(TAG, "Slot $slotIndex Audio state: currentTrack=$currentTrack, available=${tracks?.joinToString { "[${it.id}:${it.name}]" }}")
-        if (currentTrack == -1 && !tracks.isNullOrEmpty()) {
-            val validTrack = tracks.firstOrNull { it.id > 0 } ?: tracks.firstOrNull { it.id != -1 }
-            if (validTrack != null) {
+        try {
+            val tracks = try { player.audioTracks } catch (_: Exception) { null }
+            val currentTrack = try { player.audioTrack } catch (_: Exception) { -1 }
+            val validTracks = tracks?.filterNotNull()?.filter { it.id > 0 } ?: emptyList()
+
+            Log.d(TAG, "Slot $slotIndex Audio state: currentTrack=$currentTrack, available=${validTracks.joinToString { "[${it.id}:${it.name ?: "Track"}]" }}")
+            if (currentTrack <= 0 && validTracks.isNotEmpty()) {
+                val validTrack = validTracks.first()
                 player.audioTrack = validTrack.id
-                Log.i(TAG, "Slot $slotIndex auto-selected audio track ${validTrack.id}: ${validTrack.name}")
+                Log.i(TAG, "Slot $slotIndex auto-selected audio track ${validTrack.id}: ${validTrack.name ?: "Track"}")
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex non-fatal audio track selection: ${e.message}")
         }
     }
 
+    @Synchronized
     private fun safelyAttach(slotIndex: Int) {
         val player = mediaPlayers[slotIndex] ?: return
         val layout = activeLayouts[slotIndex] ?: return
-        if (!player.vlcVout.areViewsAttached()) {
-            try {
+        try {
+            if (!player.vlcVout.areViewsAttached()) {
                 // Use SurfaceView (4th arg false) for zero-copy hardware video overlay plane rendering (VPU to display)
                 player.attachViews(layout, null, false, false)
                 Log.d(TAG, "Slot $slotIndex attached views to VLC layout (SurfaceView Hardware Overlay)")
-            } catch (e: Exception) {
-                Log.w(TAG, "Error attaching views for slot $slotIndex: ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex non-fatal view attach: ${e.message}")
         }
     }
 
+    @Synchronized
     private fun safelyDetach(slotIndex: Int) {
         val player = mediaPlayers[slotIndex] ?: return
-        if (player.vlcVout.areViewsAttached()) {
-            try {
+        try {
+            if (player.vlcVout.areViewsAttached()) {
                 player.detachViews()
                 Log.d(TAG, "Slot $slotIndex detached views from VLC layout")
-            } catch (e: Exception) {
-                Log.w(TAG, "Error detaching views for slot $slotIndex: ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex non-fatal view detach: ${e.message}")
         }
     }
 
@@ -137,6 +143,10 @@ class VlcMultiViewPlayerController(
 
     override fun play(slotIndex: Int, streamUrl: String) {
         if (slotIndex !in 0..3) return
+        if (streamUrl.isBlank()) {
+            stop(slotIndex)
+            return
+        }
         if (activeUrls[slotIndex] == streamUrl && mediaPlayers[slotIndex] != null) {
             return
         }
@@ -144,7 +154,12 @@ class VlcMultiViewPlayerController(
         val player = getOrCreatePlayer(slotIndex)
 
         try {
-            val media = Media(libVlc, Uri.parse(streamUrl)).apply {
+            if (player.isPlaying) {
+                player.stop()
+            }
+
+            val mediaUri = Uri.parse(streamUrl)
+            val media = Media(libVlc, mediaUri).apply {
                 // Force MediaCodec hardware acceleration for video (second arg = true forces HW decoding for MPEG-2)
                 setHWDecoderEnabled(true, true)
                 // Disable MediaCodec for audio so LibVLC's software decoder downmixes 5.1 surround sound to stereo PCM
@@ -176,61 +191,82 @@ class VlcMultiViewPlayerController(
     override fun getDecoderBadge(slotIndex: Int): String {
         if (slotIndex !in 0..3) return "MediaCodec HW"
         val player = mediaPlayers[slotIndex] ?: return "MediaCodec HW"
-        val track = player.currentVideoTrack
-        if (track != null && track.width > 0) {
-            val res = if (track.height >= 1000) "1080i" else if (track.height in 700..750) "720p" else "${track.width}x${track.height}"
-            val codecName = when {
-                track.codec?.contains("mp2", true) == true -> "MPEG-2"
-                track.codec?.contains("h264", true) == true -> "H.264"
-                track.codec?.contains("hevc", true) == true || track.codec?.contains("h265", true) == true -> "HEVC"
-                else -> track.codec?.uppercase() ?: "HW"
+        return try {
+            val track = player.currentVideoTrack
+            if (track != null && track.width > 0) {
+                val res = if (track.height >= 1000) "1080i" else if (track.height in 700..750) "720p" else "${track.width}x${track.height}"
+                val codecName = when {
+                    track.codec?.contains("mp2", true) == true -> "MPEG-2"
+                    track.codec?.contains("h264", true) == true -> "H.264"
+                    track.codec?.contains("hevc", true) == true || track.codec?.contains("h265", true) == true -> "HEVC"
+                    else -> track.codec?.uppercase() ?: "HW"
+                }
+                "HW • MediaCodec ($codecName $res)"
+            } else {
+                "HW • MediaCodec"
             }
-            return "HW • MediaCodec ($codecName $res)"
+        } catch (e: Exception) {
+            "HW • MediaCodec"
         }
-        return "HW • MediaCodec"
     }
 
     override fun stop(slotIndex: Int) {
         if (slotIndex !in 0..3) return
         AudioTranscodeManager.stopTranscode(slotIndex)
         activeUrls[slotIndex] = null
-        mediaPlayers[slotIndex]?.let { player ->
-            if (player.isPlaying) {
-                player.stop()
+        try {
+            mediaPlayers[slotIndex]?.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
+                }
+                safelyDetach(slotIndex)
             }
-            safelyDetach(slotIndex)
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex non-fatal stop error: ${e.message}")
         }
         Log.i(TAG, "Slot $slotIndex stopped")
     }
 
     override fun pause(slotIndex: Int) {
         if (slotIndex in 0..3) {
-            mediaPlayers[slotIndex]?.let { player ->
-                if (player.isPlaying) {
-                    player.pause()
+            try {
+                mediaPlayers[slotIndex]?.let { player ->
+                    if (player.isPlaying) {
+                        player.pause()
+                    }
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Slot $slotIndex non-fatal pause error: ${e.message}")
             }
         }
     }
 
     override fun resume(slotIndex: Int) {
         if (slotIndex in 0..3) {
-            mediaPlayers[slotIndex]?.let { player ->
-                if (!player.isPlaying) {
-                    player.play()
+            try {
+                mediaPlayers[slotIndex]?.let { player ->
+                    if (!player.isPlaying) {
+                        player.play()
+                    }
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Slot $slotIndex non-fatal resume error: ${e.message}")
             }
         }
     }
 
     override fun togglePause(slotIndex: Int) {
         if (slotIndex in 0..3) {
-            mediaPlayers[slotIndex]?.let { player ->
-                if (player.isPlaying) {
-                    player.pause()
-                } else {
-                    player.play()
+            try {
+                mediaPlayers[slotIndex]?.let { player ->
+                    if (player.isPlaying) {
+                        player.pause()
+                    } else {
+                        player.play()
+                    }
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Slot $slotIndex non-fatal togglePause error: ${e.message}")
             }
         }
     }
@@ -239,9 +275,13 @@ class VlcMultiViewPlayerController(
         if (slotIndex !in 0..3) return
         slotMutedStates[slotIndex] = isMuted
         val player = mediaPlayers[slotIndex] ?: return
-        player.volume = if (isMuted) 0 else 100
-        if (!isMuted) {
-            ensureAudioTrackSelected(slotIndex, player)
+        try {
+            player.volume = if (isMuted) 0 else 100
+            if (!isMuted) {
+                ensureAudioTrackSelected(slotIndex, player)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex non-fatal setMuted error: ${e.message}")
         }
         Log.d(TAG, "Slot $slotIndex setMuted: $isMuted (player.volume=${player.volume})")
     }
@@ -249,35 +289,53 @@ class VlcMultiViewPlayerController(
     override fun getAudioTracks(slotIndex: Int): List<Pair<Int, String>> {
         if (slotIndex !in 0..3) return emptyList()
         val player = mediaPlayers[slotIndex] ?: return emptyList()
-        return player.audioTracks?.filter { it.id > 0 }?.map { it.id to it.name } ?: emptyList()
+        return try {
+            player.audioTracks?.filterNotNull()?.filter { it.id > 0 }?.map { it.id to (it.name ?: "Track ${it.id}") } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     override fun getSelectedAudioTrack(slotIndex: Int): Int {
         if (slotIndex !in 0..3) return -1
-        return mediaPlayers[slotIndex]?.audioTrack ?: -1
+        return try {
+            mediaPlayers[slotIndex]?.audioTrack ?: -1
+        } catch (e: Exception) {
+            -1
+        }
     }
 
     override fun selectAudioTrack(slotIndex: Int, trackId: Int) {
         if (slotIndex !in 0..3) return
         val player = mediaPlayers[slotIndex] ?: return
-        player.audioTrack = trackId
-        Log.i(TAG, "Slot $slotIndex manually selected audio track $trackId")
+        try {
+            player.audioTrack = trackId
+            Log.i(TAG, "Slot $slotIndex manually selected audio track $trackId")
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex error setting audio track $trackId: ${e.message}")
+        }
     }
 
     override fun cycleAudioTrack(slotIndex: Int): String? {
         if (slotIndex !in 0..3) return null
         val player = mediaPlayers[slotIndex] ?: return null
-        val tracks = player.audioTracks?.filter { it.id > 0 } ?: return null
-        if (tracks.isEmpty()) return null
-        val current = player.audioTrack
-        val currentIndex = tracks.indexOfFirst { it.id == current }
-        val nextIndex = if (currentIndex < 0 || currentIndex >= tracks.size - 1) 0 else currentIndex + 1
-        val nextTrack = tracks[nextIndex]
-        player.audioTrack = nextTrack.id
-        Log.i(TAG, "Slot $slotIndex cycled audio track to ${nextTrack.id} (${nextTrack.name})")
-        return nextTrack.name
+        return try {
+            val tracks = player.audioTracks?.filterNotNull()?.filter { it.id > 0 } ?: return null
+            if (tracks.isEmpty()) return null
+            val current = player.audioTrack
+            val currentIndex = tracks.indexOfFirst { it.id == current }
+            val nextIndex = if (currentIndex < 0 || currentIndex >= tracks.size - 1) 0 else currentIndex + 1
+            val nextTrack = tracks[nextIndex]
+            player.audioTrack = nextTrack.id
+            Log.i(TAG, "Slot $slotIndex cycled audio track to ${nextTrack.id} (${nextTrack.name})")
+            nextTrack.name ?: "Track ${nextTrack.id}"
+        } catch (e: Exception) {
+            Log.w(TAG, "Slot $slotIndex error cycling audio track: ${e.message}")
+            null
+        }
     }
 
+    @Synchronized
     override fun attachVideoLayout(slotIndex: Int, layout: VLCVideoLayout) {
         if (slotIndex !in 0..3) return
         val currentLayout = activeLayouts[slotIndex]
@@ -286,11 +344,7 @@ class VlcMultiViewPlayerController(
             return
         }
         if (player != null && player.vlcVout.areViewsAttached()) {
-            try {
-                player.detachViews()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error detaching previous views for slot $slotIndex: ${e.message}")
-            }
+            safelyDetach(slotIndex)
         }
         activeLayouts[slotIndex] = layout
         safelyAttach(slotIndex)
@@ -300,6 +354,7 @@ class VlcMultiViewPlayerController(
         detachVideoLayout(slotIndex, null)
     }
 
+    @Synchronized
     override fun detachVideoLayout(slotIndex: Int, layout: VLCVideoLayout?) {
         if (slotIndex !in 0..3) return
         if (layout == null || activeLayouts[slotIndex] === layout) {

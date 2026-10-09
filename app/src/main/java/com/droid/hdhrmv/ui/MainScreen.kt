@@ -111,13 +111,17 @@ fun MainScreen(
     // Sync state changes with playerController
     LaunchedEffect(state.slots) {
         state.slots.forEach { slot ->
-            val channel = slot.channel
-            if (channel != null) {
-                playerController.playChannel(slot.slotIndex, channel)
-            } else {
-                playerController.stop(slot.slotIndex)
+            try {
+                val channel = slot.channel
+                if (channel != null) {
+                    playerController.playChannel(slot.slotIndex, channel)
+                } else {
+                    playerController.stop(slot.slotIndex)
+                }
+                playerController.setMuted(slot.slotIndex, slot.isMuted)
+            } catch (e: Exception) {
+                android.util.Log.e("MainScreen", "Error syncing slot ${slot.slotIndex}: ${e.message}", e)
             }
-            playerController.setMuted(slot.slotIndex, slot.isMuted)
         }
     }
 
@@ -364,7 +368,6 @@ fun MainScreen(
                 deviceIp = state.selectedDevice?.ipAddress,
                 onChannelSelected = { channel ->
                     viewModel.setChannelForSlot(slotIndex, channel)
-                    viewModel.setFocusedSlot(slotIndex)
                 },
                 onClearSlot = {
                     viewModel.setChannelForSlot(slotIndex, null)

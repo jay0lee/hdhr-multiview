@@ -262,7 +262,7 @@ fun QuickStartChannelDialog(
                             .fillMaxWidth()
                             .padding(6.dp)
                     ) {
-                        itemsIndexed(effectiveChannels, key = { _, ch -> ch.guideNumber }) { index, channel ->
+                        itemsIndexed(effectiveChannels, key = { index, ch -> "${ch.guideNumber}_${ch.streamUrl}_$index" }) { index, channel ->
                             val slotIndex = selectedChannels.indexOfFirst { it.guideNumber == channel.guideNumber }
                             val isSelected = slotIndex != -1
 

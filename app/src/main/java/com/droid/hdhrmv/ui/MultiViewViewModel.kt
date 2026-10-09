@@ -141,13 +141,19 @@ class MultiViewViewModel(
         }
     }
 
-    fun setChannelForSlot(slotIndex: Int, channel: Channel?) {
+    fun setChannelForSlot(slotIndex: Int, channel: Channel?, focusSlot: Boolean = true) {
         _uiState.update { current ->
-            val updatedSlots = MultiviewLayoutManager.assignChannel(current.slots, slotIndex, channel)
+            var updatedSlots = MultiviewLayoutManager.assignChannel(current.slots, slotIndex, channel)
+            val newFocusedIndex = if (focusSlot && channel != null) slotIndex else current.focusedSlotIndex
+            if (focusSlot && channel != null) {
+                updatedSlots = MultiviewLayoutManager.setFocusedSlot(updatedSlots, slotIndex)
+            }
             current.copy(
                 slots = updatedSlots,
+                focusedSlotIndex = newFocusedIndex,
                 isChannelPickerOpen = false,
-                channelPickerTargetSlot = null
+                channelPickerTargetSlot = null,
+                isTopBarFocused = false
             )
         }
     }

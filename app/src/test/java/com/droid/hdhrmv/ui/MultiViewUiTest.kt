@@ -14,6 +14,8 @@ import com.droid.hdhrmv.data.HdHomeRunRepository
 import com.droid.hdhrmv.model.Channel
 import com.droid.hdhrmv.model.HdHomeRunDevice
 import com.droid.hdhrmv.player.MultiViewPlayerController
+import com.droid.hdhrmv.ui.components.ChannelPickerDialog
+import com.droid.hdhrmv.ui.components.QuickStartChannelDialog
 import com.droid.hdhrmv.ui.theme.HDHRMultiViewTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -147,5 +149,103 @@ class MultiViewUiTest {
 
         assertTrue(viewModel.uiState.value.isChannelPickerOpen)
         assertEquals(0, viewModel.uiState.value.channelPickerTargetSlot)
+    }
+
+    @Test
+    fun channelPickerDialog_selectingChannel_triggersCallback() {
+        val ch1 = Channel("3.1", "KYW-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v3.1")
+        val ch2 = Channel("10.1", "WCAU-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v10.1")
+        var selectedChannel: Channel? = null
+
+        composeTestRule.setContent {
+            HDHRMultiViewTheme {
+                ChannelPickerDialog(
+                    slotIndex = 0,
+                    channels = listOf(ch1, ch2),
+                    onChannelSelected = { selectedChannel = it },
+                    onClearSlot = {},
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("KYW-TV").performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(ch1, selectedChannel)
+    }
+
+    @Test
+    fun quickStartDialog_duplicateChannelNumbers_rendersWithoutCrashing() {
+        // Two channels sharing identical guideNumber to simulate multi-tuner or simulcast lineup scans
+        val ch1 = Channel("3.1", "KYW-TV Main", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v3.1")
+        val ch2 = Channel("3.1", "KYW-TV Alt", "HEVC", "AC3", true, "http://10.1.0.4:5004/auto/v3.1-alt")
+
+        composeTestRule.setContent {
+            HDHRMultiViewTheme {
+                QuickStartChannelDialog(
+                    channels = listOf(ch1, ch2),
+                    onLaunch = {},
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Quick Start MultiView").assertIsDisplayed()
+        composeTestRule.onNodeWithText("KYW-TV Main").assertIsDisplayed()
+        composeTestRule.onNodeWithText("KYW-TV Alt").assertIsDisplayed()
+    }
+
+    @Test
+    fun quickStartDialog_autoFillAndLaunch_triggersLaunchCallback() {
+        val ch1 = Channel("3.1", "KYW-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v3.1")
+        val ch2 = Channel("10.1", "WCAU-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v10.1")
+        var launchedChannels: List<Channel>? = null
+
+        composeTestRule.setContent {
+            HDHRMultiViewTheme {
+                QuickStartChannelDialog(
+                    channels = listOf(ch1, ch2),
+                    onLaunch = { launchedChannels = it },
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Auto-Fill Top 4").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Launch MultiView (2/4)").performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(listOf(ch1, ch2), launchedChannels)
+    }
+
+    @Test
+    fun rapidChannelChanges_synchronouslySyncsSlots() = runTest {
+        val ch1 = Channel("3.1", "KYW-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v3.1")
+        val ch2 = Channel("10.1", "WCAU-TV", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v10.1")
+        val ch3 = Channel("12.1", "WHYY", "MPEG2", "AC3", true, "http://10.1.0.4:5004/auto/v12.1")
+
+        composeTestRule.setContent {
+            HDHRMultiViewTheme {
+                MainScreen(
+                    viewModel = viewModel,
+                    playerController = playerController
+                )
+            }
+        }
+
+        viewModel.setChannelForSlot(0, ch1)
+        viewModel.setChannelForSlot(0, ch2)
+        viewModel.setChannelForSlot(0, ch3)
+        advanceUntilIdle()
+        composeTestRule.waitForIdle()
+
+        assertEquals("http://10.1.0.4:5004/auto/v12.1", playerController.playedSlots[0])
+        assertEquals(ch3, viewModel.uiState.value.slots[0].channel)
     }
 }

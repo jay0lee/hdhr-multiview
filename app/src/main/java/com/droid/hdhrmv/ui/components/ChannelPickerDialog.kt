@@ -236,7 +236,7 @@ fun ChannelPickerDialog(
                             .fillMaxWidth()
                             .height(320.dp)
                     ) {
-                        itemsIndexed(filteredChannels, key = { _, ch -> ch.guideNumber }) { index, channel ->
+                        itemsIndexed(filteredChannels, key = { index, ch -> "${ch.guideNumber}_${ch.streamUrl}_$index" }) { index, channel ->
                             ChannelRow(
                                 channel = channel,
                                 modifier = if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier,

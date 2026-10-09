@@ -11,8 +11,8 @@ android {
         applicationId = "com.jay0lee.hdhrmultiview"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "1.1.7"
+        versionCode = 19
+        versionName = "1.1.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

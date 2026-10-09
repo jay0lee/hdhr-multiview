@@ -135,7 +135,7 @@ class MainActivity : ComponentActivity() {
         val focusedSlot = currentState.focusedSlotIndex
 
         // If an overlay dialog is open, let dialog handle navigation keys
-        if (currentState.isChannelPickerOpen || currentState.slotActionTargetSlot != null) {
+        if (currentState.isChannelPickerOpen || currentState.slotActionTargetSlot != null || currentState.isQuickStartOpen) {
             return super.onKeyDown(keyCode, event)
         }
 
