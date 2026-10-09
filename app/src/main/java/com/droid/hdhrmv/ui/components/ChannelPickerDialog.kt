@@ -162,7 +162,7 @@ fun ChannelPickerDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                val effectiveIp = deviceIp ?: "10.1.0.4"
+                val effectiveIp = deviceIp?.takeIf { it.isNotBlank() && it != "127.0.0.1" }
                 if (filteredChannels.isEmpty()) {
                     Column(
                         modifier = Modifier
@@ -171,14 +171,16 @@ fun ChannelPickerDialog(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = if (channels.isEmpty()) "Loading channels or lineup empty."
-                                   else "No channels match \"$searchQuery\"",
+                            text = if (channels.isEmpty()) {
+                                if (effectiveIp == null) "Scanning network for HDHomeRun devices…"
+                                else "Loading channel lineup from HDHomeRun…"
+                            } else "No channels match \"$searchQuery\"",
                             color = TextSecondary,
                             fontSize = 13.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        if (searchQuery.isNotBlank()) {
+                        if (searchQuery.isNotBlank() && effectiveIp != null) {
                             Button(
                                 onClick = {
                                     val cleanNum = searchQuery.trim()
@@ -194,7 +196,7 @@ fun ChannelPickerDialog(
                             ) {
                                 Text("Tune to Channel $searchQuery", color = SurfaceDark, fontWeight = FontWeight.Bold)
                             }
-                        } else {
+                        } else if (effectiveIp != null) {
                             // Quick Presets from detected HDHR
                             Text("Quick Select:", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(6.dp))

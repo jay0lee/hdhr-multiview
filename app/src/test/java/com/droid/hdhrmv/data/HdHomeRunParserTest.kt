@@ -136,4 +136,31 @@ class HdHomeRunParserTest {
         assertEquals("10.1.0.4", devices[0].localIp)
         assertEquals("http://10.1.0.4/discover.json", devices[0].discoverUrl)
     }
+
+    @Test
+    fun parseLineup_resolvesRelativeAndMissingUrlsWithFallbackIp() {
+        val json = """
+            [
+              {
+                "GuideNumber": "3.1",
+                "GuideName": "KYW-TV",
+                "URL": "/auto/v3.1"
+              },
+              {
+                "GuideNumber": "10.1",
+                "GuideName": "WCAU-TV"
+              },
+              {
+                "GuideNumber": "12.1",
+                "GuideName": "WHYY",
+                "URL": "http://hdhomerun.local:5004/auto/v12.1"
+              }
+            ]
+        """.trimIndent()
+        val channels = HdHomeRunParser.parseLineup(json, "192.168.1.150")
+        assertEquals(3, channels.size)
+        assertEquals("http://192.168.1.150:5004/auto/v3.1", channels[0].streamUrl)
+        assertEquals("http://192.168.1.150:5004/auto/v10.1", channels[1].streamUrl)
+        assertEquals("http://192.168.1.150:5004/auto/v12.1", channels[2].streamUrl)
+    }
 }

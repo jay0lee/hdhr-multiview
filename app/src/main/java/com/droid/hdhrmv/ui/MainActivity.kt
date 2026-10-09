@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.droid.hdhrmv.data.DefaultHdHomeRunNetworkClient
 import com.droid.hdhrmv.data.HdHomeRunRepository
+import com.droid.hdhrmv.data.SharedPrefsDevicePreferences
 import com.droid.hdhrmv.model.MultiviewMode
 import com.droid.hdhrmv.player.MultiViewPlayerController
 import com.droid.hdhrmv.player.VlcMultiViewPlayerController
@@ -70,7 +71,11 @@ class MainActivity : ComponentActivity() {
         }
 
         val networkClient = DefaultHdHomeRunNetworkClient()
-        val repository = HdHomeRunRepository(networkClient)
+        val preferences = SharedPrefsDevicePreferences(this)
+        val repository = HdHomeRunRepository(
+            networkClient = networkClient,
+            preferences = preferences
+        )
 
         viewModel = ViewModelProvider(
             this,

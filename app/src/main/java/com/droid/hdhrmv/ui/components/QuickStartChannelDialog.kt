@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -47,6 +49,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,18 +75,19 @@ fun QuickStartChannelDialog(
     val firstItemFocusRequester = remember { FocusRequester() }
     val launchButtonFocusRequester = remember { FocusRequester() }
 
-    // Fallback preset channels if lineup is empty
+    // Fallback preset channels if lineup is empty and valid device IP is known
     val effectiveChannels = remember(channels, deviceIp) {
         if (channels.isNotEmpty()) {
             channels
-        } else {
-            val ip = deviceIp ?: "127.0.0.1"
+        } else if (!deviceIp.isNullOrBlank() && deviceIp != "127.0.0.1") {
             listOf(
-                Channel("3.1", "KYW-TV (CBS)", "MPEG2", "AC3", true, "http://$ip:5004/auto/v3.1"),
-                Channel("10.1", "WCAU-TV (NBC)", "MPEG2", "AC3", true, "http://$ip:5004/auto/v10.1"),
-                Channel("12.1", "WHYY (PBS)", "MPEG2", "AC3", true, "http://$ip:5004/auto/v12.1"),
-                Channel("29.1", "WTXFDT (FOX)", "MPEG2", "AC3", true, "http://$ip:5004/auto/v29.1")
+                Channel("3.1", "KYW-TV (CBS)", "MPEG2", "AC3", true, "http://$deviceIp:5004/auto/v3.1"),
+                Channel("10.1", "WCAU-TV (NBC)", "MPEG2", "AC3", true, "http://$deviceIp:5004/auto/v10.1"),
+                Channel("12.1", "WHYY (PBS)", "MPEG2", "AC3", true, "http://$deviceIp:5004/auto/v12.1"),
+                Channel("29.1", "WTXFDT (FOX)", "MPEG2", "AC3", true, "http://$deviceIp:5004/auto/v29.1")
             )
+        } else {
+            emptyList()
         }
     }
 
@@ -257,17 +261,46 @@ fun QuickStartChannelDialog(
                         .fillMaxWidth()
                         .height(280.dp)
                 ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(6.dp)
-                    ) {
-                        itemsIndexed(effectiveChannels, key = { index, ch -> "${ch.guideNumber}_${ch.streamUrl}_$index" }) { index, channel ->
-                            val slotIndex = selectedChannels.indexOfFirst { it.guideNumber == channel.guideNumber }
-                            val isSelected = slotIndex != -1
+                    if (effectiveChannels.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = PrimaryCyan,
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Discovering HDHomeRun tuners…",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Checking local Wi-Fi/Ethernet for devices.",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(6.dp)
+                        ) {
+                            itemsIndexed(effectiveChannels, key = { index, ch -> "${ch.guideNumber}_${ch.streamUrl}_$index" }) { index, channel ->
+                                val slotIndex = selectedChannels.indexOfFirst { it.guideNumber == channel.guideNumber }
+                                val isSelected = slotIndex != -1
 
-                            QuickStartChannelRow(
-                                channel = channel,
+                                QuickStartChannelRow(
+                                    channel = channel,
                                 slotNumber = if (isSelected) slotIndex + 1 else null,
                                 modifier = Modifier
                                     .then(if (index == 0) Modifier.focusRequester(firstItemFocusRequester) else Modifier)
@@ -288,6 +321,7 @@ fun QuickStartChannelDialog(
                         }
                     }
                 }
+            }
             }
         },
         confirmButton = {

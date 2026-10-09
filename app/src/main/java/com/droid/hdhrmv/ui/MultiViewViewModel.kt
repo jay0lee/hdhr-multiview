@@ -76,7 +76,7 @@ class MultiViewViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, selectedDevice = device, errorMessage = null) }
             try {
-                val lineup = repository.fetchLineup(device.lineupUrl)
+                val lineup = repository.fetchLineup(device.lineupUrl, device.ipAddress)
                 val tuners = repository.fetchTunerStatus(device.baseUrl)
                 val freeCount = HdHomeRunParser.calculateFreeTuners(tuners, device.tunerCount)
 

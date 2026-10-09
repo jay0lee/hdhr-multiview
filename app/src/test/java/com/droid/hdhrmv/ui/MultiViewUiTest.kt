@@ -248,4 +248,21 @@ class MultiViewUiTest {
         assertEquals("http://10.1.0.4:5004/auto/v12.1", playerController.playedSlots[0])
         assertEquals(ch3, viewModel.uiState.value.slots[0].channel)
     }
+
+    @Test
+    fun quickStartDialog_emptyChannelsAndNullIp_showsDiscoveringState() {
+        composeTestRule.setContent {
+            HDHRMultiViewTheme {
+                QuickStartChannelDialog(
+                    channels = emptyList(),
+                    deviceIp = null,
+                    onLaunch = {},
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Discovering HDHomeRun tuners…").assertIsDisplayed()
+    }
 }

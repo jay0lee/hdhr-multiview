@@ -22,18 +22,27 @@ class VlcMultiViewPlayerController(
 
     private val slotMutedStates = BooleanArray(4) { it != 0 } // Slot 0 starts unmuted, others muted
 
+    private val hasHardwareMpeg2Decoder: Boolean by lazy {
+        try {
+            val codecList = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+            codecList.codecInfos.any { info ->
+                !info.isEncoder &&
+                info.supportedTypes.any { it.equals("video/mpeg2", ignoreCase = true) } &&
+                !info.isSoftwareOnly
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private val libVlc: LibVLC by lazy {
         val options = arrayListOf(
-            "--network-caching=1000",
-            "--live-caching=1000",
+            "--network-caching=1500",
+            "--live-caching=1500",
             "--audio-time-stretch",
-            "--audio-resampler=soxr",
             "--deinterlace=1",
             "--deinterlace-mode=blend",
             "--aout=android_audiotrack",
-            "--no-audio-passthrough",
-            "--stereo-mode=1",
-            "--no-mediacodec-audio",
             "-v"
         )
         LibVLC(context.applicationContext, options)
@@ -64,10 +73,13 @@ class VlcMultiViewPlayerController(
                             onPlaybackStateChanged(slotIndex, false, buffering, null)
                         }
                         MediaPlayer.Event.EncounteredError -> {
-                            Log.e(TAG, "Slot $slotIndex VLC Event: EncounteredError")
+                            val failedUrl = activeUrls[slotIndex]
+                            activeUrls[slotIndex] = null
+                            Log.e(TAG, "Slot $slotIndex VLC Event: EncounteredError for url: $failedUrl")
                             onPlaybackStateChanged(slotIndex, false, false, "Playback error")
                         }
                         MediaPlayer.Event.Stopped -> {
+                            activeUrls[slotIndex] = null
                             Log.d(TAG, "Slot $slotIndex VLC Event: Stopped")
                             onPlaybackStateChanged(slotIndex, false, false, null)
                         }
@@ -160,16 +172,12 @@ class VlcMultiViewPlayerController(
 
             val mediaUri = Uri.parse(streamUrl)
             val media = Media(libVlc, mediaUri).apply {
-                // Force MediaCodec hardware acceleration for video (second arg = true forces HW decoding for MPEG-2)
-                setHWDecoderEnabled(true, true)
-                // Disable MediaCodec for audio so LibVLC's software decoder downmixes 5.1 surround sound to stereo PCM
-                addOption(":no-mediacodec-audio")
-                // Disable raw digital audio passthrough to prevent HDMI handshake silence on TVs
-                addOption(":no-audio-passthrough")
-                // Force stereo downmix
-                addOption(":stereo-mode=1")
-                addOption(":network-caching=1000")
-                addOption(":live-caching=1000")
+                // MediaCodec hardware acceleration with graceful software fallback (second arg = false allows SW fallback)
+                setHWDecoderEnabled(true, false)
+                addOption(":network-caching=1500")
+                addOption(":live-caching=1500")
+                addOption(":clock-jitter=0")
+                addOption(":clock-synchro=0")
                 addOption(":deinterlace=1")
                 addOption(":deinterlace-mode=blend")
             }
@@ -181,32 +189,38 @@ class VlcMultiViewPlayerController(
             val isMuted = slotMutedStates[slotIndex]
             player.volume = if (isMuted) 0 else 100
             player.play()
-            Log.i(TAG, "Slot $slotIndex playing: $streamUrl (initial volume=${player.volume}, muted=$isMuted, HW=forced)")
+            Log.i(TAG, "Slot $slotIndex started playback for URL: $streamUrl (volume=${player.volume}, muted=$isMuted)")
         } catch (e: Exception) {
+            activeUrls[slotIndex] = null
             Log.e(TAG, "Error playing slot $slotIndex: ${e.message}", e)
             onPlaybackStateChanged(slotIndex, false, false, e.message)
         }
     }
 
     override fun getDecoderBadge(slotIndex: Int): String {
-        if (slotIndex !in 0..3) return "MediaCodec HW"
-        val player = mediaPlayers[slotIndex] ?: return "MediaCodec HW"
+        if (slotIndex !in 0..3) return "Ready"
+        val player = mediaPlayers[slotIndex] ?: return "Ready"
         return try {
             val track = player.currentVideoTrack
             if (track != null && track.width > 0) {
                 val res = if (track.height >= 1000) "1080i" else if (track.height in 700..750) "720p" else "${track.width}x${track.height}"
+                val isMpeg2 = track.codec?.contains("mp2", true) == true
+                val isH264 = track.codec?.contains("h264", true) == true
+                val isHevc = track.codec?.contains("hevc", true) == true || track.codec?.contains("h265", true) == true
                 val codecName = when {
-                    track.codec?.contains("mp2", true) == true -> "MPEG-2"
-                    track.codec?.contains("h264", true) == true -> "H.264"
-                    track.codec?.contains("hevc", true) == true || track.codec?.contains("h265", true) == true -> "HEVC"
-                    else -> track.codec?.uppercase() ?: "HW"
+                    isMpeg2 -> "MPEG-2"
+                    isH264 -> "H.264"
+                    isHevc -> "HEVC"
+                    else -> track.codec?.uppercase() ?: "Video"
                 }
-                "HW • MediaCodec ($codecName $res)"
+                val isHw = if (isMpeg2) hasHardwareMpeg2Decoder else true
+                val engineType = if (isHw) "HW • MediaCodec" else "SW • LibVLC"
+                "$engineType ($codecName $res)"
             } else {
-                "HW • MediaCodec"
+                if (player.isPlaying) "Playing" else "Buffering"
             }
         } catch (e: Exception) {
-            "HW • MediaCodec"
+            "Ready"
         }
     }
 

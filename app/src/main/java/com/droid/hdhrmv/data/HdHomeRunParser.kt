@@ -35,7 +35,7 @@ object HdHomeRunParser {
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun parseLineup(json: String): List<Channel> {
+    fun parseLineup(json: String, fallbackIp: String? = null): List<Channel> {
         val type = Types.newParameterizedType(List::class.java, Map::class.java)
         val adapter = moshi.adapter<List<Map<String, Any?>>>(type)
         val list = adapter.fromJson(json) ?: emptyList()
@@ -46,10 +46,12 @@ object HdHomeRunParser {
             val videoCodec = item["VideoCodec"] as? String
             val audioCodec = item["AudioCodec"] as? String
             val isHd = ((item["HD"] as? Number)?.toInt() ?: 0) == 1
-            val url = item["URL"] as? String ?: ""
+            val rawUrl = item["URL"] as? String ?: ""
             val favorite = ((item["Favorite"] as? Number)?.toInt() ?: 0) == 1
             val signalStrength = (item["SignalStrength"] as? Number)?.toInt()
             val signalQuality = (item["SignalQuality"] as? Number)?.toInt()
+
+            val streamUrl = resolveStreamUrl(rawUrl, guideNumber, fallbackIp)
 
             Channel(
                 guideNumber = guideNumber,
@@ -57,12 +59,27 @@ object HdHomeRunParser {
                 videoCodec = videoCodec,
                 audioCodec = audioCodec,
                 isHd = isHd,
-                streamUrl = url,
+                streamUrl = streamUrl,
                 favorite = favorite,
                 signalStrength = signalStrength,
                 signalQuality = signalQuality
             )
         }
+    }
+
+    fun resolveStreamUrl(rawUrl: String, guideNumber: String, fallbackIp: String?): String {
+        val cleanFallback = fallbackIp?.removePrefix("http://")?.substringBefore(":")?.substringBefore("/")
+        if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+            if (rawUrl.contains(".local") && !cleanFallback.isNullOrBlank()) {
+                val pathAndQuery = rawUrl.substringAfter(".local:5004", rawUrl.substringAfter(".local", "/auto/v$guideNumber"))
+                return "http://$cleanFallback:5004$pathAndQuery"
+            }
+            return rawUrl
+        }
+        if (rawUrl.startsWith("/")) {
+            return if (!cleanFallback.isNullOrBlank()) "http://$cleanFallback:5004$rawUrl" else rawUrl
+        }
+        return if (!cleanFallback.isNullOrBlank()) "http://$cleanFallback:5004/auto/v$guideNumber" else ""
     }
 
     @Suppress("UNCHECKED_CAST")

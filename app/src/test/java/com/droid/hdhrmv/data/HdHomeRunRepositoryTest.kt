@@ -97,4 +97,24 @@ class HdHomeRunRepositoryTest {
         val freeCount = HdHomeRunParser.calculateFreeTuners(tuners, 4)
         assertEquals(3, freeCount)
     }
+
+    @Test
+    fun discoverDevices_usesCachedIpFromPreferencesImmediately() = runTest {
+        val fakeClient = FakeNetworkClient(
+            mapOf(
+                "http://10.1.0.4/discover.json" to sampleDiscoverJson,
+                "http://10.1.0.4/status.json" to sampleStatusJson
+            )
+        )
+        val prefs = InMemoryDevicePreferences(cachedIp = "10.1.0.4")
+        val repository = HdHomeRunRepository(
+            networkClient = fakeClient,
+            preferences = prefs
+        )
+        val devices = repository.discoverDevices()
+
+        assertEquals(1, devices.size)
+        assertEquals("10A1D769", devices[0].deviceId)
+        assertEquals("10.1.0.4", devices[0].ipAddress)
+    }
 }
