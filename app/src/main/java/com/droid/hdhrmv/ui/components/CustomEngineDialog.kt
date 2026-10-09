@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.droid.hdhrmv.player.AudioTranscodeManager
+import com.droid.hdhrmv.player.DecoderAllocationMode
+import com.droid.hdhrmv.player.MultiViewPlayerController
 import com.droid.hdhrmv.ui.theme.AccentAmber
 import com.droid.hdhrmv.ui.theme.AccentGreen
 import com.droid.hdhrmv.ui.theme.BorderFocused
@@ -54,6 +60,7 @@ import com.droid.hdhrmv.ui.theme.TextSecondary
 
 @Composable
 fun CustomEngineDialog(
+    playerController: MultiViewPlayerController? = null,
     onDismiss: () -> Unit,
     onEngineUpdated: () -> Unit = {}
 ) {
@@ -154,6 +161,69 @@ fun CustomEngineDialog(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
+                    }
+                }
+
+                // VPU Hardware Decoder Allocation Strategy
+                var currentDecoderMode by remember {
+                    mutableStateOf(playerController?.getDecoderAllocationMode() ?: DecoderAllocationMode.HYBRID_2_HW)
+                }
+
+                Surface(
+                    color = SurfaceElevated,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, PrimaryCyan.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "HARDWARE DECODER ALLOCATION",
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        DecoderAllocationMode.values().forEach { mode ->
+                            val isSelected = currentDecoderMode == mode
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelected) PrimaryCyan.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable {
+                                        currentDecoderMode = mode
+                                        playerController?.setDecoderAllocationMode(mode)
+                                        onEngineUpdated()
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = null,
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = PrimaryCyan,
+                                        unselectedColor = TextSecondary
+                                    ),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = mode.title,
+                                        color = if (isSelected) PrimaryCyan else TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        text = mode.description,
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

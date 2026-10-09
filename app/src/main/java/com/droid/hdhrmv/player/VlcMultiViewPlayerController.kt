@@ -22,6 +22,31 @@ class VlcMultiViewPlayerController(
 
     private val slotMutedStates = BooleanArray(4) { it != 0 } // Slot 0 starts unmuted, others muted
 
+    private val preferences = com.droid.hdhrmv.data.SharedPrefsDevicePreferences(context)
+    private var decoderMode: DecoderAllocationMode = run {
+        val saved = preferences.getDecoderMode()
+        DecoderAllocationMode.values().find { it.name == saved } ?: DecoderAllocationMode.HYBRID_2_HW
+    }
+
+    override fun getDecoderAllocationMode(): DecoderAllocationMode = decoderMode
+
+    override fun setDecoderAllocationMode(mode: DecoderAllocationMode) {
+        if (decoderMode != mode) {
+            decoderMode = mode
+            preferences.setDecoderMode(mode.name)
+            Log.i(TAG, "Decoder allocation mode updated to: $mode")
+        }
+    }
+
+    fun isHwDecoderAllocatedForSlot(slotIndex: Int): Boolean {
+        return when (decoderMode) {
+            DecoderAllocationMode.HYBRID_2_HW -> slotIndex < 2
+            DecoderAllocationMode.SINGLE_HW -> slotIndex == 0
+            DecoderAllocationMode.ALL_HW -> true
+            DecoderAllocationMode.ALL_SW -> false
+        }
+    }
+
     private val hasHardwareMpeg2Decoder: Boolean by lazy {
         try {
             val codecList = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
@@ -171,9 +196,15 @@ class VlcMultiViewPlayerController(
             }
 
             val mediaUri = Uri.parse(streamUrl)
+            val allowHw = isHwDecoderAllocatedForSlot(slotIndex)
             val media = Media(libVlc, mediaUri).apply {
-                // MediaCodec hardware acceleration with graceful software fallback (second arg = false allows SW fallback)
-                setHWDecoderEnabled(true, false)
+                if (allowHw) {
+                    // MediaCodec hardware acceleration with graceful software fallback
+                    setHWDecoderEnabled(true, false)
+                } else {
+                    // Explicitly force multi-threaded software decoding (bypasses MediaCodec)
+                    setHWDecoderEnabled(false, false)
+                }
                 addOption(":network-caching=1500")
                 addOption(":live-caching=1500")
                 addOption(":clock-jitter=0")
@@ -189,7 +220,7 @@ class VlcMultiViewPlayerController(
             val isMuted = slotMutedStates[slotIndex]
             player.volume = if (isMuted) 0 else 100
             player.play()
-            Log.i(TAG, "Slot $slotIndex started playback for URL: $streamUrl (volume=${player.volume}, muted=$isMuted)")
+            Log.i(TAG, "Slot $slotIndex started playback for URL: $streamUrl (HW-allocated=$allowHw, volume=${player.volume}, muted=$isMuted)")
         } catch (e: Exception) {
             activeUrls[slotIndex] = null
             Log.e(TAG, "Error playing slot $slotIndex: ${e.message}", e)
@@ -213,7 +244,8 @@ class VlcMultiViewPlayerController(
                     isHevc -> "HEVC"
                     else -> track.codec?.uppercase() ?: "Video"
                 }
-                val isHw = if (isMpeg2) hasHardwareMpeg2Decoder else true
+                val isHwConfigured = isHwDecoderAllocatedForSlot(slotIndex)
+                val isHw = isHwConfigured && (if (isMpeg2) hasHardwareMpeg2Decoder else true)
                 val engineType = if (isHw) "HW • MediaCodec" else "SW • LibVLC"
                 "$engineType ($codecName $res)"
             } else {

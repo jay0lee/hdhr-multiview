@@ -6,6 +6,8 @@ import android.content.SharedPreferences
 interface DevicePreferences {
     fun getLastConnectedIp(): String?
     fun setLastConnectedIp(ip: String)
+    fun getDecoderMode(): String?
+    fun setDecoderMode(mode: String)
 }
 
 class SharedPrefsDevicePreferences(context: Context) : DevicePreferences {
@@ -22,10 +24,19 @@ class SharedPrefsDevicePreferences(context: Context) : DevicePreferences {
             prefs.edit().putString("last_connected_device_ip", ip).apply()
         }
     }
+
+    override fun getDecoderMode(): String? {
+        return prefs.getString("decoder_allocation_mode", null)
+    }
+
+    override fun setDecoderMode(mode: String) {
+        prefs.edit().putString("decoder_allocation_mode", mode).apply()
+    }
 }
 
 class InMemoryDevicePreferences(
-    private var cachedIp: String? = null
+    private var cachedIp: String? = null,
+    private var cachedDecoderMode: String? = null
 ) : DevicePreferences {
     override fun getLastConnectedIp(): String? = cachedIp
 
@@ -33,5 +44,11 @@ class InMemoryDevicePreferences(
         if (ip.isNotBlank() && ip != "127.0.0.1") {
             cachedIp = ip
         }
+    }
+
+    override fun getDecoderMode(): String? = cachedDecoderMode
+
+    override fun setDecoderMode(mode: String) {
+        cachedDecoderMode = mode
     }
 }

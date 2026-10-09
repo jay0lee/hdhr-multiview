@@ -408,6 +408,7 @@ fun MainScreen(
         // Custom Media Engine Settings Dialog
         if (showCustomEngineDialog) {
             CustomEngineDialog(
+                playerController = playerController,
                 onDismiss = {
                     showCustomEngineDialog = false
                 },

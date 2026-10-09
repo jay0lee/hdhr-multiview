@@ -54,6 +54,15 @@ interface MultiViewPlayerController {
     fun getSelectedAudioTrack(slotIndex: Int): Int = -1
     fun selectAudioTrack(slotIndex: Int, trackId: Int) {}
     fun cycleAudioTrack(slotIndex: Int): String? = null
+    fun getDecoderAllocationMode(): DecoderAllocationMode = DecoderAllocationMode.HYBRID_2_HW
+    fun setDecoderAllocationMode(mode: DecoderAllocationMode) {}
+}
+
+enum class DecoderAllocationMode(val title: String, val description: String) {
+    HYBRID_2_HW("Hybrid (2 HW + 2 SW)", "Slots 1-2 Hardware, Slots 3-4 Software (Recommended for 4 Streams)"),
+    SINGLE_HW("Single HW (1 HW + 3 SW)", "Slot 1 Hardware, Slots 2-4 Software (Lowest VPU usage)"),
+    ALL_HW("All Hardware (4 HW)", "All slots attempt MediaCodec hardware acceleration"),
+    ALL_SW("All Software (4 SW)", "All slots use multi-threaded CPU software decoding")
 }
 
 @OptIn(UnstableApi::class)
